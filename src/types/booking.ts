@@ -1,4 +1,4 @@
-export type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'rescheduled';
+export type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'rescheduled' | 'pending_review';
 
 export interface BookingData {
   date: string;

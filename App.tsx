@@ -9,7 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Toast from 'react-native-toast-message';
 
-import { AuthProvider, CartProvider, ThemeProvider, SocketProvider, useTheme } from './src/contexts';
+import { AuthProvider, CartProvider, ThemeProvider, SocketProvider, NotificationProvider, useTheme } from './src/contexts';
 import { AppNavigator } from './src/navigation';
 
 // Error Boundary Component
@@ -74,7 +74,9 @@ function App() {
             <AuthProvider>
               <CartProvider>
                 <SocketProvider>
-                  <AppContent />
+                  <NotificationProvider>
+                    <AppContent />
+                  </NotificationProvider>
                 </SocketProvider>
               </CartProvider>
             </AuthProvider>

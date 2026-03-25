@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle, TouchableOpacity } from 'react-native';
 import { colors } from '../../theme';
+import { useTheme } from '../../contexts';
 
 interface CardProps {
   children: React.ReactNode;
@@ -17,17 +18,19 @@ export const Card: React.FC<CardProps> = ({
   variant = 'default',
   padding = 'md',
 }) => {
+  const { theme } = useTheme();
+
   const getVariantStyles = (): ViewStyle => {
     switch (variant) {
       case 'outlined':
         return {
           borderWidth: 1,
-          borderColor: colors.gray[200],
-          backgroundColor: colors.white,
+          borderColor: theme.border,
+          backgroundColor: theme.surface,
         };
       case 'elevated':
         return {
-          backgroundColor: colors.white,
+          backgroundColor: theme.surface,
           shadowColor: colors.black,
           shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.1,
@@ -36,7 +39,7 @@ export const Card: React.FC<CardProps> = ({
         };
       default:
         return {
-          backgroundColor: colors.white,
+          backgroundColor: theme.surface,
           shadowColor: colors.black,
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.05,

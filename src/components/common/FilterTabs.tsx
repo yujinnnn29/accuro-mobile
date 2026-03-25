@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { colors } from '../../theme';
+import { useTheme } from '../../contexts';
 
 interface FilterOption {
   key: string;
@@ -21,6 +22,7 @@ export const FilterTabs: React.FC<FilterTabsProps> = ({
   onSelect,
   scrollable = true,
 }) => {
+  const { theme, isDark } = useTheme();
   const renderTabs = () => (
     <>
       {options.map((option) => {
@@ -30,6 +32,7 @@ export const FilterTabs: React.FC<FilterTabsProps> = ({
             key={option.key}
             style={[
               styles.tab,
+              { backgroundColor: isDark ? theme.surface : colors.gray[100], borderColor: theme.border },
               isSelected && styles.tabSelected,
             ]}
             onPress={() => onSelect(option.key)}
@@ -38,6 +41,7 @@ export const FilterTabs: React.FC<FilterTabsProps> = ({
             <Text
               style={[
                 styles.tabText,
+                { color: theme.textSecondary },
                 isSelected && styles.tabTextSelected,
               ]}
             >
@@ -47,12 +51,14 @@ export const FilterTabs: React.FC<FilterTabsProps> = ({
               <View
                 style={[
                   styles.countBadge,
+                  { backgroundColor: isDark ? theme.border : colors.gray[200] },
                   isSelected && styles.countBadgeSelected,
                 ]}
               >
                 <Text
                   style={[
                     styles.countText,
+                    { color: theme.textSecondary },
                     isSelected && styles.countTextSelected,
                   ]}
                 >

@@ -17,19 +17,23 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.row}>
-        <Text style={styles.label}>Items in cart</Text>
+        <Text style={styles.label}>Items in quote list</Text>
         <Text style={styles.value}>{itemCount}</Text>
       </View>
       <View style={styles.divider} />
       <Text style={styles.note}>
-        Submit your cart items to receive a customized quotation from our team.
+        Submit your quote list items to receive a customized quotation from our team.
+      </Text>
+      <Text style={styles.priceNote}>
+        Prices shown are estimated. Final pricing will be confirmed in your personalized quote.
       </Text>
       <Button
-        title="Request Quotation"
+        title="Request Official Quote"
         onPress={onRequestQuotation}
         fullWidth
         loading={loading}
         disabled={itemCount === 0}
+        style={{ backgroundColor: '#16a34a' }}
       />
     </View>
   );
@@ -70,7 +74,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.gray[500],
     lineHeight: 18,
+    marginBottom: 8,
+  },
+  priceNote: {
+    fontSize: 12,
+    color: colors.primary[700],
+    fontWeight: '600',
+    lineHeight: 18,
     marginBottom: 16,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 8,
+    padding: 10,
   },
 });
 

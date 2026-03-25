@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { ArrowLeft, Star } from 'lucide-react-native';
 import { reviewService } from '../../api';
-import { useAuth } from '../../contexts';
+import { useAuth, useTheme } from '../../contexts';
 import { Review } from '../../types';
 import { colors } from '../../theme';
 import { LoadingSpinner, FilterTabs, EmptyState } from '../../components/common';
@@ -30,6 +30,7 @@ const filterOptions: { key: FilterKey; label: string }[] = [
 export const TestimonialsScreen: React.FC = () => {
   const navigation = useNavigation();
   const { user, isAuthenticated } = useAuth();
+  const { theme } = useTheme();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -88,11 +89,11 @@ export const TestimonialsScreen: React.FC = () => {
   const renderHeader = () => (
     <View>
       {/* Stats Card */}
-      <View style={styles.statsCard}>
+      <View style={[styles.statsCard, { backgroundColor: theme.surface }]}>
         <View style={styles.ratingContainer}>
-          <Text style={styles.averageRating}>{calculateAverageRating()}</Text>
+          <Text style={[styles.averageRating, { color: theme.text }]}>{calculateAverageRating()}</Text>
           <StarRating rating={parseFloat(calculateAverageRating())} size={24} />
-          <Text style={styles.reviewCount}>
+          <Text style={[styles.reviewCount, { color: theme.textSecondary }]}>
             Based on {reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}
           </Text>
         </View>
@@ -101,7 +102,7 @@ export const TestimonialsScreen: React.FC = () => {
       {/* Write Review Button / Form */}
       {isAuthenticated && !showForm && (
         <TouchableOpacity
-          style={styles.writeReviewButton}
+          style={[styles.writeReviewButton, { backgroundColor: theme.surface }]}
           onPress={() => setShowForm(true)}
           activeOpacity={0.7}
         >
@@ -117,7 +118,7 @@ export const TestimonialsScreen: React.FC = () => {
         />
       )}
 
-      <Text style={styles.sectionTitle}>Customer Reviews</Text>
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>Customer Reviews</Text>
     </View>
   );
 
@@ -142,21 +143,21 @@ export const TestimonialsScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <ArrowLeft size={24} color={colors.gray[900]} />
+          <ArrowLeft size={24} color={theme.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Testimonials</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Testimonials</Text>
         <View style={styles.headerRight} />
       </View>
 
       {/* Filters */}
-      <View style={styles.filterContainer}>
+      <View style={[styles.filterContainer, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
         <FilterTabs
           options={filterOptions}
           selectedKey={selectedFilter}

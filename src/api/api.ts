@@ -13,10 +13,11 @@ export const setOnUnauthorized = (callback: AuthEventCallback) => {
 // Create axios instance with default config
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
+  adapter: 'fetch', // Use fetch adapter — avoids React Native XHR _requestId:null drop on long cold starts
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30000,
+  timeout: 90000, // 90 seconds - allows backend cold start (~20-30s on Render.com free tier)
 });
 
 // Request interceptor to add auth token

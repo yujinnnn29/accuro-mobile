@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, FileText, Package } from 'lucide-react-native';
 import { quotationService, Quotation } from '../../api';
 import { colors } from '../../theme';
+import { useTheme } from '../../contexts';
 import { LoadingSpinner, FilterTabs, EmptyState, Card, Button, Input } from '../../components/common';
 import { QuotationStatusBadge } from '../../components/quotation';
 
@@ -26,6 +27,7 @@ const filterOptions: { key: FilterKey; label: string }[] = [
 ];
 
 export const AdminQuotationsScreen: React.FC = () => {
+  const { theme } = useTheme();
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -46,8 +48,7 @@ export const AdminQuotationsScreen: React.FC = () => {
 
   const fetchQuotations = useCallback(async () => {
     try {
-      const params = selectedFilter !== 'all' ? { status: selectedFilter } : undefined;
-      const response = await quotationService.getAllQuotations(params);
+      const response = await quotationService.getAllQuotations();
       setQuotations(response.data || []);
     } catch (error) {
       console.error('Error fetching quotations:', error);
@@ -55,7 +56,7 @@ export const AdminQuotationsScreen: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selectedFilter]);
+  }, []);
 
   useEffect(() => {
     fetchQuotations();
@@ -125,9 +126,9 @@ export const AdminQuotationsScreen: React.FC = () => {
     );
   };
 
-  const filteredQuotations = quotations.filter((quotation) => {
-    return quotation.quotationNumber.toLowerCase().includes(searchQuery.toLowerCase());
-  });
+  const filteredQuotations = quotations
+    .filter((q) => selectedFilter === 'all' || q.status === selectedFilter)
+    .filter((q) => q.quotationNumber.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const getFilterCounts = () => {
     return filterOptions.map((option) => ({
@@ -153,21 +154,21 @@ export const AdminQuotationsScreen: React.FC = () => {
       <Card style={styles.quotationCard} padding="md">
         <View style={styles.quotationHeader}>
           <View style={styles.quotationInfo}>
-            <Text style={styles.quotationNumber}>{item.quotationNumber}</Text>
-            <Text style={styles.quotationDate}>{formatDate(item.createdAt)}</Text>
+            <Text style={[styles.quotationNumber, { color: theme.text }]}>{item.quotationNumber}</Text>
+            <Text style={[styles.quotationDate, { color: theme.textSecondary }]}>{formatDate(item.createdAt)}</Text>
           </View>
           <QuotationStatusBadge status={item.status} size="sm" />
         </View>
 
-        <View style={styles.itemsSection}>
+        <View style={[styles.itemsSection, { borderTopColor: theme.border }]}>
           <View style={styles.itemsHeader}>
-            <Package size={16} color={colors.gray[500]} />
-            <Text style={styles.itemsCount}>
+            <Package size={16} color={colors.gray[400]} />
+            <Text style={[styles.itemsCount, { color: theme.textSecondary }]}>
               {itemCount} {itemCount === 1 ? 'item' : 'items'}
             </Text>
           </View>
           {item.items.slice(0, 2).map((i, index) => (
-            <Text key={index} style={styles.itemName} numberOfLines={1}>
+            <Text key={index} style={[styles.itemName, { color: theme.textSecondary }]} numberOfLines={1}>
               {i.quantity}x {i.productName}
             </Text>
           ))}
@@ -197,8 +198,8 @@ export const AdminQuotationsScreen: React.FC = () => {
         )}
 
         {item.status === 'approved' && item.totalAmount && (
-          <View style={styles.approvedInfo}>
-            <Text style={styles.approvedLabel}>Approved Amount:</Text>
+          <View style={[styles.approvedInfo, { borderTopColor: theme.border }]}>
+            <Text style={[styles.approvedLabel, { color: theme.textSecondary }]}>Approved Amount:</Text>
             <Text style={styles.approvedAmount}>
               PHP {item.totalAmount.toLocaleString()}
             </Text>
@@ -221,13 +222,13 @@ export const AdminQuotationsScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['bottom']}>
       {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
+      <View style={[styles.searchContainer, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+        <View style={[styles.searchBar, { backgroundColor: theme.background }]}>
           <Search size={20} color={colors.gray[400]} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: theme.text }]}
             placeholder="Search by quotation number..."
             placeholderTextColor={colors.gray[400]}
             value={searchQuery}
@@ -237,7 +238,7 @@ export const AdminQuotationsScreen: React.FC = () => {
       </View>
 
       {/* Filters */}
-      <View style={styles.filterContainer}>
+      <View style={[styles.filterContainer, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
         <FilterTabs
           options={getFilterCounts()}
           selectedKey={selectedFilter}

@@ -3,13 +3,20 @@ import api from './api';
 export interface QuotationItem {
   productId: string;
   productName: string;
+  productImage?: string;
   quantity: number;
-  specifications?: Record<string, any>;
+  specifications?: string;
 }
 
 export interface CreateQuotationData {
   items: QuotationItem[];
   notes?: string;
+  // Extended fields used by RequestQuoteScreen (matches website)
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  company?: string;
+  additionalRequirements?: string;
 }
 
 export interface Quotation {
@@ -19,10 +26,22 @@ export interface Quotation {
   items: QuotationItem[];
   status: 'pending' | 'approved' | 'rejected' | 'expired';
   totalAmount?: number;
+  currency?: string;
   validUntil?: string;
   terms?: string;
+  termsAndConditions?: string;
+  paymentTerms?: string;
+  deliveryTerms?: string;
   notes?: string;
   adminNotes?: string;
+  additionalRequirements?: string;
+  pdfUrl?: string;
+  approvedAt?: string;
+  rejectedAt?: string;
+  company?: string;
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -63,7 +82,7 @@ export const quotationService = {
 
   // Get user's quotations
   getMyQuotations: async (filters?: QuotationFilters): Promise<QuotationsResponse> => {
-    const response = await api.get('/quotations/my', { params: filters });
+    const response = await api.get('/quotations', { params: filters });
     return response.data;
   },
 

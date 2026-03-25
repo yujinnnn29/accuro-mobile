@@ -1,15 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import {
-  Bell,
-  Calendar,
-  FileText,
-  CheckCircle,
-  AlertCircle,
-  Info,
-  X,
-} from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Bell, Calendar, FileText, CheckCircle, AlertCircle, Info, X } from 'lucide-react-native';
 import { colors } from '../../theme';
+import { useTheme } from '../../contexts';
 
 export type NotificationType = 'booking' | 'quotation' | 'general' | 'success' | 'warning' | 'info';
 
@@ -36,6 +29,21 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
   onMarkAsRead,
   onDelete,
 }) => {
+  const [expanded, setExpanded] = useState(false);
+  const [isTruncated, setIsTruncated] = useState(false);
+  const { isDark, theme } = useTheme();
+
+  const handlePress = () => {
+    if (onPress) {
+      onPress();
+    }
+    if (isTruncated) {
+      setExpanded((prev) => !prev);
+    }
+    if (!notification.isRead && onMarkAsRead) {
+      onMarkAsRead();
+    }
+  };
   const getIcon = () => {
     const iconProps = { size: 20, color: colors.white };
     switch (notification.type) {
@@ -88,9 +96,10 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
     <TouchableOpacity
       style={[
         styles.container,
-        !notification.isRead && styles.unread,
+        { backgroundColor: theme.surface, borderBottomColor: theme.border },
+        !notification.isRead && { backgroundColor: isDark ? colors.navy[800] : colors.primary[50] },
       ]}
-      onPress={onPress}
+      onPress={handlePress}
       activeOpacity={0.7}
     >
       <View style={[styles.iconContainer, { backgroundColor: getIconBackground() }]}>
@@ -98,7 +107,7 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
       </View>
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.title} numberOfLines={1}>
+          <Text style={[styles.title, { color: theme.text }]} numberOfLines={2}>
             {notification.title}
           </Text>
           {onDelete && (
@@ -110,16 +119,32 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
             </TouchableOpacity>
           )}
         </View>
-        <Text style={styles.message} numberOfLines={2}>
+        {/* Invisible text to measure actual rendered line count */}
+        <Text
+          style={[styles.message, { opacity: 0, position: 'absolute', color: 'transparent' }]}
+          onTextLayout={(e) => {
+            if (e.nativeEvent.lines.length > 2) {
+              setIsTruncated(true);
+            }
+          }}
+        >
           {notification.message}
         </Text>
+        <Text style={[styles.message, { color: theme.textSecondary }]} numberOfLines={expanded ? undefined : 2}>
+          {notification.message}
+        </Text>
+        {isTruncated && (
+          <View style={styles.expandRow}>
+            {expanded
+              ? <ChevronUp size={14} color={colors.primary[600]} />
+              : <ChevronDown size={14} color={colors.primary[600]} />}
+            <Text style={styles.expandText}>
+              {expanded ? 'Show less' : 'Show more'}
+            </Text>
+          </View>
+        )}
         <View style={styles.footer}>
           <Text style={styles.time}>{formatTime(notification.createdAt)}</Text>
-          {!notification.isRead && onMarkAsRead && (
-            <TouchableOpacity onPress={onMarkAsRead}>
-              <Text style={styles.markRead}>Mark as read</Text>
-            </TouchableOpacity>
-          )}
         </View>
       </View>
       {!notification.isRead && <View style={styles.unreadDot} />}
@@ -177,7 +202,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.gray[400],
   },
-  markRead: {
+  expandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    gap: 3,
+  },
+  expandText: {
     fontSize: 12,
     color: colors.primary[600],
     fontWeight: '500',

@@ -4,6 +4,7 @@ import { Clock, Building2, ChevronRight, Calendar } from 'lucide-react-native';
 import { colors } from '../../theme';
 import { TodayScheduleItem } from '../../types';
 import { Card, Badge } from '../common';
+import { useTheme } from '../../contexts';
 
 interface TodayScheduleCardProps {
   items: TodayScheduleItem[];
@@ -18,6 +19,7 @@ export const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({
   onViewAll,
   loading,
 }) => {
+  const { theme } = useTheme();
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
     const hour = parseInt(hours, 10);
@@ -28,17 +30,17 @@ export const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({
 
   const renderItem = ({ item }: { item: TodayScheduleItem }) => (
     <TouchableOpacity
-      style={styles.scheduleItem}
+      style={[styles.scheduleItem, { borderBottomColor: theme.border }]}
       onPress={() => onItemPress?.(item)}
       activeOpacity={0.7}
     >
       <View style={styles.timeContainer}>
         <Clock size={14} color={colors.gray[400]} />
-        <Text style={styles.timeText}>{formatTime(item.time)}</Text>
+        <Text style={[styles.timeText, { color: theme.textSecondary }]}>{formatTime(item.time)}</Text>
       </View>
       <View style={styles.itemContent}>
         <View style={styles.itemHeader}>
-          <Text style={styles.companyName} numberOfLines={1}>
+          <Text style={[styles.companyName, { color: theme.text }]} numberOfLines={1}>
             {item.company}
           </Text>
           <Badge
@@ -48,7 +50,7 @@ export const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({
           />
         </View>
         <View style={styles.itemDetails}>
-          <Text style={styles.detailText} numberOfLines={1}>
+          <Text style={[styles.detailText, { color: theme.textSecondary }]} numberOfLines={1}>
             {item.contactName} - {item.product}
           </Text>
         </View>
@@ -66,10 +68,10 @@ export const TodayScheduleCard: React.FC<TodayScheduleCardProps> = ({
 
   return (
     <Card style={styles.card} padding="none">
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <View>
-          <Text style={styles.title}>Today's Schedule</Text>
-          <Text style={styles.subtitle}>
+          <Text style={[styles.title, { color: theme.text }]}>Today's Schedule</Text>
+          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
             {items.length} booking{items.length !== 1 ? 's' : ''} today
           </Text>
         </View>

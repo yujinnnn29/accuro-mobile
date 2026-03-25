@@ -30,8 +30,9 @@ export const LineChart: React.FC<LineChartProps> = ({
   const paddingX = 30;
   const paddingY = 20;
 
-  // Handle empty data
-  const chartData = data?.data?.length > 0 ? data.data.filter(v => typeof v === 'number' && !isNaN(v)) : [0];
+  // Handle empty data - ensure at least one element to avoid invalid SVG paths
+  const filteredData = data?.data?.length > 0 ? data.data.filter(v => typeof v === 'number' && !isNaN(v)) : [];
+  const chartData = filteredData.length > 0 ? filteredData : [0];
   const chartLabels = data?.labels || [];
 
   const maxValue = Math.max(...chartData, 1);
@@ -48,16 +49,18 @@ export const LineChart: React.FC<LineChartProps> = ({
     return paddingY + chartHeight - ((safeValue - minValue) / range) * chartHeight;
   };
 
-  const pathData = chartData
-    .map((value, index) => {
-      const x = getX(index);
-      const y = getY(value);
-      return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
-    })
-    .join(' ');
+  const pathData = chartData.length > 0
+    ? chartData
+        .map((value, index) => {
+          const x = getX(index);
+          const y = getY(value);
+          return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
+        })
+        .join(' ')
+    : `M ${paddingX} ${paddingY + chartHeight}`;
 
   // Fill area path
-  const fillPathData = `${pathData} L ${getX(chartData.length - 1)} ${paddingY + chartHeight} L ${getX(0)} ${paddingY + chartHeight} Z`;
+  const fillPathData = `${pathData} L ${getX(Math.max(chartData.length - 1, 0))} ${paddingY + chartHeight} L ${getX(0)} ${paddingY + chartHeight} Z`;
 
   return (
     <View style={[styles.chartContainer, { height }]}>
@@ -147,8 +150,9 @@ export const BarChart: React.FC<BarChartProps> = ({
   const paddingX = 40;
   const paddingY = 20;
 
-  // Handle empty data
-  const chartData = data?.data?.length > 0 ? data.data.filter(v => typeof v === 'number' && !isNaN(v)) : [0];
+  // Handle empty data - ensure at least one element to avoid invalid SVG paths
+  const filteredData = data?.data?.length > 0 ? data.data.filter(v => typeof v === 'number' && !isNaN(v)) : [];
+  const chartData = filteredData.length > 0 ? filteredData : [0];
   const chartLabels = data?.labels || [];
   const chartColors = data?.colors || [];
 

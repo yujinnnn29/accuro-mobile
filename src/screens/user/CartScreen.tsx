@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { useCart, useAuth } from '../../contexts';
-import { quotationService } from '../../api';
+import { useCart, useAuth, useTheme } from '../../contexts';
 import { CartItem as CartItemType } from '../../types';
 import { colors } from '../../theme';
 import { EmptyState } from '../../components/common';
@@ -18,8 +17,8 @@ import { CartItem, CartSummary } from '../../components/cart';
 export const CartScreen: React.FC = () => {
   const navigation = useNavigation();
   const { isAuthenticated } = useAuth();
-  const { cart, updateQuantity, removeFromCart, clearCart, getItemCount } = useCart();
-  const [loading, setLoading] = useState(false);
+  const { cart, updateQuantity, removeFromCart, getItemCount } = useCart();
+  const { theme } = useTheme();
 
   const handleUpdateQuantity = (productId: string, quantity: number) => {
     if (quantity <= 0) {
@@ -32,7 +31,7 @@ export const CartScreen: React.FC = () => {
   const handleRemoveItem = (productId: string) => {
     Alert.alert(
       'Remove Item',
-      'Are you sure you want to remove this item from your cart?',
+      'Are you sure you want to remove this item from your quote list?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -44,7 +43,7 @@ export const CartScreen: React.FC = () => {
     );
   };
 
-  const handleRequestQuotation = async () => {
+  const handleRequestQuotation = () => {
     if (!isAuthenticated) {
       Alert.alert(
         'Login Required',
@@ -61,44 +60,15 @@ export const CartScreen: React.FC = () => {
     }
 
     if (cart.length === 0) {
-      Alert.alert('Empty Cart', 'Please add items to your cart before requesting a quotation.');
+      Alert.alert('Empty Quote List', 'Please add items to your quote list before requesting a quotation.');
       return;
     }
 
-    setLoading(true);
-    try {
-      const quotationData = {
-        items: cart.map((item) => ({
-          productId: item.product._id,
-          productName: item.product.name,
-          quantity: item.quantity,
-          specifications: item.product.specifications,
-        })),
-      };
-
-      await quotationService.createQuotation(quotationData);
-
-      Alert.alert(
-        'Quotation Requested',
-        'Your quotation request has been submitted successfully. Our team will review it and get back to you soon.',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              clearCart();
-              navigation.getParent()?.navigate('MoreTab', { screen: 'MyQuotations' });
-            },
-          },
-        ]
-      );
-    } catch (error: any) {
-      Alert.alert(
-        'Error',
-        error.response?.data?.message || 'Failed to submit quotation request. Please try again.'
-      );
-    } finally {
-      setLoading(false);
-    }
+    // Navigate to RequestQuote screen with cart items pre-populated
+    navigation.getParent()?.navigate('HomeTab', {
+      screen: 'RequestQuote',
+      params: { fromCart: true },
+    });
   };
 
   const renderCartItem = ({ item }: { item: CartItemType }) => (
@@ -112,20 +82,20 @@ export const CartScreen: React.FC = () => {
   const renderEmpty = () => (
     <EmptyState
       icon="cart"
-      title="Your Cart is Empty"
-      description="Browse our products and add items to your cart to request a quotation."
+      title="Your Quote List is Empty"
+      description="Browse our products and add items to your quote list to request a quotation."
       actionLabel="Browse Products"
       onAction={() => navigation.getParent()?.navigate('HomeTab', { screen: 'Products' })}
     />
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Shopping Cart</Text>
+      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Quote List</Text>
         {cart.length > 0 && (
-          <Text style={styles.headerSubtitle}>
+          <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
             {getItemCount()} {getItemCount() === 1 ? 'item' : 'items'}
           </Text>
         )}
@@ -147,7 +117,6 @@ export const CartScreen: React.FC = () => {
           <CartSummary
             itemCount={getItemCount()}
             onRequestQuotation={handleRequestQuotation}
-            loading={loading}
           />
         </View>
       )}

@@ -12,6 +12,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { bookingService } from '../../api';
 import { Booking, BookingStatus } from '../../types';
 import { colors } from '../../theme';
+import { useTheme } from '../../contexts';
 import { LoadingSpinner, FilterTabs, EmptyState } from '../../components/common';
 import { BookingCard } from '../../components/booking';
 import { BookingsStackParamList } from '../../navigation/types';
@@ -26,10 +27,13 @@ const filterOptions: { key: FilterKey; label: string }[] = [
   { key: 'confirmed', label: 'Confirmed' },
   { key: 'completed', label: 'Completed' },
   { key: 'cancelled', label: 'Cancelled' },
+  { key: 'rescheduled', label: 'Rescheduled' },
+  { key: 'pending_review', label: 'In Review' },
 ];
 
 export const MyBookingsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const { theme } = useTheme();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -104,17 +108,17 @@ export const MyBookingsScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Bookings</Text>
-        <Text style={styles.headerSubtitle}>
+      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>My Bookings</Text>
+        <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
           {bookings.length} {bookings.length === 1 ? 'booking' : 'bookings'} total
         </Text>
       </View>
 
       {/* Filters */}
-      <View style={styles.filterContainer}>
+      <View style={[styles.filterContainer, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
         <FilterTabs
           options={getFilterCounts()}
           selectedKey={selectedFilter}

@@ -87,7 +87,16 @@ class ProductService {
     const response = await api.get<ProductsResponse>('/products/low-stock', {
       params: threshold ? { threshold } : undefined,
     });
-    return response.data;
+    // Normalize response to handle both wrapped and unwrapped formats
+    const data = response.data;
+    if (data && typeof data === 'object' && 'success' in data && 'data' in data) {
+      return data;
+    }
+    // If data is an array directly, wrap it
+    if (Array.isArray(data)) {
+      return { success: true, data } as unknown as ProductsResponse;
+    }
+    return { success: true, data: data || [] } as unknown as ProductsResponse;
   }
 }
 

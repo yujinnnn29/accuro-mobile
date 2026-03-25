@@ -8,9 +8,11 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import { launchImageLibrary } from 'react-native-image-picker';
 import {
   ArrowLeft,
   User,
@@ -21,15 +23,18 @@ import {
   Camera,
   CheckCircle,
   AlertCircle,
+  LogOut,
 } from 'lucide-react-native';
-import { useAuth } from '../../contexts';
+import { useAuth, useTheme } from '../../contexts';
 import { authService } from '../../api';
+import api from '../../api/api';
 import { colors } from '../../theme';
 import { Button, Input, Card, Badge } from '../../components/common';
 
 export const ProfileScreen: React.FC = () => {
   const navigation = useNavigation();
-  const { user, updateUser, refreshUser } = useAuth();
+  const { user, updateUser, refreshUser, logout } = useAuth();
+  const { theme } = useTheme();
 
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -48,7 +53,49 @@ export const ProfileScreen: React.FC = () => {
     confirmPassword: '',
   });
 
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const handleChangeAvatar = async () => {
+    try {
+      const response = await launchImageLibrary({
+        mediaType: 'photo',
+        quality: 0.8,
+        maxWidth: 512,
+        maxHeight: 512,
+      });
+
+      if (response.didCancel || response.errorCode) return;
+      const asset = response.assets?.[0];
+      if (!asset?.uri) return;
+
+      setAvatarUploading(true);
+      try {
+        const formDataUpload = new FormData();
+        formDataUpload.append('photo', {
+          uri: asset.uri,
+          type: asset.type || 'image/jpeg',
+          name: asset.fileName || 'avatar.jpg',
+        } as any);
+
+        const res = await api.put('/auth/updatedetails', formDataUpload, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+
+        if (res.data?.success && res.data?.data?.profilePicture) {
+          updateUser({ profilePicture: res.data.data.profilePicture });
+        }
+        await refreshUser();
+        Alert.alert('Success', 'Profile picture updated');
+      } catch (error: any) {
+        Alert.alert('Error', error.response?.data?.message || 'Failed to update profile picture');
+      } finally {
+        setAvatarUploading(false);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Could not open image picker');
+    }
+  };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -160,20 +207,20 @@ export const ProfileScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flex}
       >
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             style={styles.backButton}
           >
-            <ArrowLeft size={24} color={colors.gray[900]} />
+            <ArrowLeft size={24} color={theme.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Profile</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Profile</Text>
           <View style={styles.headerRight} />
         </View>
 
@@ -182,16 +229,25 @@ export const ProfileScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
         >
           {/* Profile Picture */}
-          <View style={styles.avatarSection}>
-            <View style={styles.avatarContainer}>
-              <View style={styles.avatar}>
-                <User size={48} color={colors.white} />
+          <View style={[styles.avatarSection, { backgroundColor: theme.surface }]}>
+            <TouchableOpacity
+              style={styles.avatarContainer}
+              onPress={handleChangeAvatar}
+              disabled={avatarUploading}
+              activeOpacity={0.7}
+            >
+              {user?.profilePicture ? (
+                <Image source={{ uri: user.profilePicture }} style={styles.avatarImage} />
+              ) : (
+                <View style={styles.avatar}>
+                  <User size={48} color={colors.white} />
+                </View>
+              )}
+              <View style={[styles.cameraButton, avatarUploading && { opacity: 0.5 }]}>
+                <Camera size={18} color={colors.white} />
               </View>
-              <TouchableOpacity style={styles.cameraButton}>
-                <Camera size={16} color={colors.white} />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.userName}>{user?.name}</Text>
+            </TouchableOpacity>
+            <Text style={[styles.userName, { color: theme.text }]}>{user?.name}</Text>
             <View style={styles.verificationBadge}>
               {user?.isEmailVerified ? (
                 <>
@@ -214,7 +270,7 @@ export const ProfileScreen: React.FC = () => {
           {/* Profile Form */}
           <Card style={styles.formCard} padding="lg">
             <View style={styles.formHeader}>
-              <Text style={styles.formTitle}>Personal Information</Text>
+              <Text style={[styles.formTitle, { color: theme.text }]}>Personal Information</Text>
               {!isEditing && (
                 <TouchableOpacity onPress={() => setIsEditing(true)}>
                   <Text style={styles.editButton}>Edit</Text>
@@ -279,7 +335,7 @@ export const ProfileScreen: React.FC = () => {
           {/* Change Password */}
           <Card style={styles.formCard} padding="lg">
             <View style={styles.formHeader}>
-              <Text style={styles.formTitle}>Security</Text>
+              <Text style={[styles.formTitle, { color: theme.text }]}>Security</Text>
             </View>
 
             {!showPasswordForm ? (
@@ -342,6 +398,16 @@ export const ProfileScreen: React.FC = () => {
             )}
           </Card>
 
+          {/* Logout */}
+          <TouchableOpacity
+            style={[styles.logoutButton, { backgroundColor: theme.surface }]}
+            onPress={logout}
+            activeOpacity={0.7}
+          >
+            <LogOut size={20} color={colors.error} />
+            <Text style={styles.logoutText}>Log Out</Text>
+          </TouchableOpacity>
+
           <View style={styles.bottomPadding} />
         </ScrollView>
       </KeyboardAvoidingView>
@@ -388,6 +454,8 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     position: 'relative',
+    width: 100,
+    height: 100,
     marginBottom: 12,
   },
   avatar: {
@@ -398,18 +466,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  avatarImage: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+  },
   cameraButton: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    bottom: -2,
+    right: -2,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: colors.primary[600],
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: colors.white,
+    zIndex: 10,
+    elevation: 5,
   },
   userName: {
     fontSize: 20,
@@ -463,6 +538,24 @@ const styles = StyleSheet.create({
   },
   buttonHalf: {
     flex: 1,
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+    marginHorizontal: 16,
+    marginTop: 8,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  logoutText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.error,
+    marginLeft: 8,
   },
   bottomPadding: {
     height: 24,

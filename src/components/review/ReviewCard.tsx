@@ -5,12 +5,14 @@ import { Review } from '../../types';
 import { colors } from '../../theme';
 import { Card } from '../common';
 import StarRating from './StarRating';
+import { useTheme } from '../../contexts';
 
 interface ReviewCardProps {
   review: Review;
 }
 
 export const ReviewCard: React.FC<ReviewCardProps> = ({ review }) => {
+  const { theme } = useTheme();
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -27,14 +29,14 @@ export const ReviewCard: React.FC<ReviewCardProps> = ({ review }) => {
           <User size={20} color={colors.white} />
         </View>
         <View style={styles.userInfo}>
-          <Text style={styles.userName}>{review.userName}</Text>
+          <Text style={[styles.userName, { color: theme.text }]}>{review.userName}</Text>
           {review.company && (
-            <Text style={styles.company}>{review.company}</Text>
+            <Text style={[styles.company, { color: theme.textSecondary }]}>{review.company}</Text>
           )}
         </View>
         <StarRating rating={review.rating} size={16} />
       </View>
-      <Text style={styles.comment}>{review.comment}</Text>
+      <Text style={[styles.comment, { color: theme.textSecondary }]}>{review.comment}</Text>
       <Text style={styles.date}>{formatDate(review.createdAt)}</Text>
     </Card>
   );

@@ -1,19 +1,22 @@
 import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Home, Calendar, ShoppingCart, Bell, Menu } from 'lucide-react-native';
-import { useAuth } from '../contexts';
+import { CommonActions } from '@react-navigation/native';
+import { Home, Calendar, ClipboardList, Bell, Menu } from 'lucide-react-native';
 import { colors } from '../theme';
+import { useNotifications } from '../contexts';
 import {
   MainTabParamList,
   HomeStackParamList,
   BookingsStackParamList,
   CartStackParamList,
   MoreStackParamList,
+  RootMainParamList,
 } from './types';
 
 // Import screens
-import { HomeScreen, ProductsScreen, ProductDetailScreen, BookingScreen } from '../screens/public';
+import { HomeScreen, ProductsScreen, ProductDetailScreen, BookingScreen, RequestQuoteScreen } from '../screens/public';
 import UserDashboardScreen from '../screens/user/UserDashboardScreen';
 import MyBookingsScreen from '../screens/user/MyBookingsScreen';
 import BookingDetailScreen from '../screens/user/BookingDetailScreen';
@@ -26,10 +29,12 @@ import TestimonialsScreen from '../screens/user/TestimonialsScreen';
 import ContactScreen from '../screens/user/ContactScreen';
 import AboutScreen from '../screens/user/AboutScreen';
 import MoreMenuScreen from '../screens/user/MoreMenuScreen';
+import AccountHistoryScreen from '../screens/user/AccountHistoryScreen';
 
 // Admin Navigator
 import AdminNavigator from './AdminNavigator';
 
+const RootStack = createNativeStackNavigator<RootMainParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
 const BookingsStack = createNativeStackNavigator<BookingsStackParamList>();
@@ -40,11 +45,12 @@ const MoreStack = createNativeStackNavigator<MoreStackParamList>();
 const HomeStackNavigator: React.FC = () => {
   return (
     <HomeStack.Navigator screenOptions={{ headerShown: false }}>
-      <HomeStack.Screen name="UserDashboard" component={UserDashboardScreen} />
       <HomeStack.Screen name="Home" component={HomeScreen} />
+      <HomeStack.Screen name="UserDashboard" component={UserDashboardScreen} />
       <HomeStack.Screen name="Products" component={ProductsScreen} />
       <HomeStack.Screen name="ProductDetail" component={ProductDetailScreen} />
       <HomeStack.Screen name="Booking" component={BookingScreen} />
+      <HomeStack.Screen name="RequestQuote" component={RequestQuoteScreen} />
     </HomeStack.Navigator>
   );
 };
@@ -79,12 +85,16 @@ const MoreStackNavigator: React.FC = () => {
       <MoreStack.Screen name="Testimonials" component={TestimonialsScreen} />
       <MoreStack.Screen name="Contact" component={ContactScreen} />
       <MoreStack.Screen name="About" component={AboutScreen} />
+      <MoreStack.Screen name="AccountHistory" component={AccountHistoryScreen} />
+      <MoreStack.Screen name="RequestQuote" component={RequestQuoteScreen} />
     </MoreStack.Navigator>
   );
 };
 
 // User Tab Navigator
 const UserTabNavigator: React.FC = () => {
+  const { unreadCount } = useNotifications();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -97,9 +107,20 @@ const UserTabNavigator: React.FC = () => {
             case 'BookingsTab':
               return <Calendar size={iconSize} color={color} />;
             case 'CartTab':
-              return <ShoppingCart size={iconSize} color={color} />;
+              return <ClipboardList size={iconSize} color={color} />;
             case 'NotificationsTab':
-              return <Bell size={iconSize} color={color} />;
+              return (
+                <View>
+                  <Bell size={iconSize} color={color} />
+                  {unreadCount > 0 && (
+                    <View style={tabStyles.badge}>
+                      <Text style={tabStyles.badgeText}>
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              );
             case 'MoreTab':
               return <Menu size={iconSize} color={color} />;
             default:
@@ -134,31 +155,64 @@ const UserTabNavigator: React.FC = () => {
       <Tab.Screen
         name="CartTab"
         component={CartStackNavigator}
-        options={{ tabBarLabel: 'Cart' }}
+        options={{ tabBarLabel: 'Quotes' }}
       />
       <Tab.Screen
         name="NotificationsTab"
         component={NotificationsScreen}
-        options={{ tabBarLabel: 'Alerts' }}
+        options={{ tabBarLabel: 'Notifications' }}
       />
       <Tab.Screen
         name="MoreTab"
         component={MoreStackNavigator}
         options={{ tabBarLabel: 'More' }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.dispatch(
+              CommonActions.navigate({ name: 'MoreTab', params: { screen: 'MoreMenu' } })
+            );
+          },
+        })}
       />
     </Tab.Navigator>
   );
 };
 
-// Main Navigator - Routes to Admin or User based on role
+// Main Navigator - Always shows User interface first, Admin can access admin panel via menu
 export const MainNavigator: React.FC = () => {
-  const { isAdmin } = useAuth();
-
-  if (isAdmin) {
-    return <AdminNavigator />;
-  }
-
-  return <UserTabNavigator />;
+  return (
+    <RootStack.Navigator screenOptions={{ headerShown: false }}>
+      <RootStack.Screen name="UserTabs" component={UserTabNavigator} />
+      <RootStack.Screen
+        name="AdminPanel"
+        component={AdminNavigator}
+        options={{
+          animation: 'slide_from_right',
+        }}
+      />
+    </RootStack.Navigator>
+  );
 };
+
+const tabStyles = StyleSheet.create({
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    backgroundColor: colors.error,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: 'bold',
+  },
+});
 
 export default MainNavigator;

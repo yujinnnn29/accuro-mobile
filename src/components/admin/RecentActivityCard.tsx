@@ -14,6 +14,7 @@ import { LucideIcon } from 'lucide-react-native';
 import { colors } from '../../theme';
 import { ActivityItem } from '../../types';
 import { Card } from '../common';
+import { useTheme } from '../../contexts';
 
 interface RecentActivityCardProps {
   items: ActivityItem[];
@@ -68,6 +69,7 @@ export const RecentActivityCard: React.FC<RecentActivityCardProps> = ({
   onViewAll,
   loading,
 }) => {
+  const { theme } = useTheme();
   const formatTime = (dateString: string | undefined) => {
     if (!dateString) return 'Recently';
     const date = new Date(dateString);
@@ -107,8 +109,8 @@ export const RecentActivityCard: React.FC<RecentActivityCardProps> = ({
           {!isLast && <View style={styles.timelineLine} />}
         </View>
         <View style={styles.itemContent}>
-          <Text style={styles.itemAction}>{item.action || 'Activity'}</Text>
-          <Text style={styles.itemDescription} numberOfLines={2}>
+          <Text style={[styles.itemAction, { color: theme.text }]}>{item.action || 'Activity'}</Text>
+          <Text style={[styles.itemDescription, { color: theme.textSecondary }]} numberOfLines={2}>
             {item.description}
           </Text>
           <View style={styles.itemFooter}>
@@ -133,10 +135,10 @@ export const RecentActivityCard: React.FC<RecentActivityCardProps> = ({
 
   return (
     <Card style={styles.card} padding="none">
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <View>
-          <Text style={styles.title}>Recent Activity</Text>
-          <Text style={styles.subtitle}>Latest system updates</Text>
+          <Text style={[styles.title, { color: theme.text }]}>Recent Activity</Text>
+          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Latest system updates</Text>
         </View>
         {onViewAll && items.length > 0 && (
           <TouchableOpacity onPress={onViewAll} activeOpacity={0.7}>

@@ -7,12 +7,13 @@ import {
   Image,
   TouchableOpacity,
   Linking,
-  Alert,
 } from 'react-native';
+import Toast from 'react-native-toast-message';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
-import { ArrowLeft, ExternalLink, ShoppingCart, Check } from 'lucide-react-native';
+import { ArrowLeft, ExternalLink, ClipboardPlus, Check } from 'lucide-react-native';
 import { getProductById } from '../../data/products';
-import { useCart } from '../../contexts';
+import { useCart, useAuth } from '../../contexts';
+import { recommendationService } from '../../api';
 import { colors } from '../../theme';
 import { Button } from '../../components/common';
 
@@ -25,8 +26,16 @@ export const ProductDetailScreen: React.FC = () => {
   const route = useRoute<RouteProp<ProductDetailRouteParams, 'ProductDetail'>>();
   const { productId } = route.params;
   const { addToCart, isInCart } = useCart();
+  const { user } = useAuth();
 
   const product = getProductById(productId);
+
+  // Track product view for recommendations engine (mirrors website behavior)
+  React.useEffect(() => {
+    if (product && user) {
+      recommendationService.recordInteraction('view', product._id, product.category).catch(() => {});
+    }
+  }, [product?._id, user]);
 
   if (!product) {
     return (
@@ -41,7 +50,13 @@ export const ProductDetailScreen: React.FC = () => {
 
   const handleAddToCart = () => {
     addToCart(product, 1);
-    Alert.alert('Added to Cart', `${product.name} has been added to your cart.`);
+    Toast.show({
+      type: 'success',
+      text1: 'Added to Cart',
+      text2: product.name,
+      visibilityTime: 2000,
+      position: 'bottom',
+    });
   };
 
   const handleOpenBeamex = () => {
@@ -110,9 +125,9 @@ export const ProductDetailScreen: React.FC = () => {
           style={[styles.addToCartButton, inCart && styles.addToCartButtonActive]}
           onPress={handleAddToCart}
         >
-          <ShoppingCart size={20} color={inCart ? colors.white : colors.primary[600]} />
+          <ClipboardPlus size={20} color={inCart ? colors.white : colors.primary[600]} />
           <Text style={[styles.addToCartText, inCart && styles.addToCartTextActive]}>
-            {inCart ? 'In Cart' : 'Add to Cart'}
+            {inCart ? 'In Quote' : 'Add to Quote'}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity

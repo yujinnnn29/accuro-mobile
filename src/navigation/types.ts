@@ -3,7 +3,13 @@ import { NavigatorScreenParams } from '@react-navigation/native';
 // Root Stack
 export type RootStackParamList = {
   Auth: NavigatorScreenParams<AuthStackParamList>;
-  Main: NavigatorScreenParams<MainTabParamList>;
+  Main: NavigatorScreenParams<RootMainParamList>;
+};
+
+// Root Main Stack (contains User Tabs and Admin Panel)
+export type RootMainParamList = {
+  UserTabs: NavigatorScreenParams<MainTabParamList>;
+  AdminPanel: undefined;
 };
 
 // Auth Stack
@@ -31,6 +37,7 @@ export type HomeStackParamList = {
   Products: undefined;
   ProductDetail: { productId: string };
   Booking: { productId?: string };
+  RequestQuote: { fromCart?: boolean } | undefined;
 };
 
 // Bookings Stack
@@ -55,6 +62,8 @@ export type MoreStackParamList = {
   Contact: undefined;
   About: undefined;
   Settings: undefined;
+  AccountHistory: undefined;
+  RequestQuote: { fromCart?: boolean } | undefined;
 };
 
 // Admin Navigator
@@ -74,6 +83,7 @@ export type AdminDrawerParamList = {
   AdminReports: undefined;
   AdminActivityLogs: undefined;
   AdminSettings: undefined;
+  AdminRecommendations: undefined;
 };
 
 // Utility type for navigation prop

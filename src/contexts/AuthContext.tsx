@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { InteractionManager } from 'react-native';
 import { authService } from '../api';
 import { User, LoginData, RegisterData } from '../types';
 
@@ -6,7 +7,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (data: LoginData) => Promise<void>;
-  register: (data: RegisterData) => Promise<void>;
+  register: (data: RegisterData) => Promise<any>;
   logout: () => Promise<void>;
   updateUser: (userData: Partial<User>) => void;
   refreshUser: () => Promise<void>;
@@ -37,14 +38,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const token = await authService.getToken();
       if (token) {
+        // Use cached user data immediately so the app opens without waiting for cold start
+        const cachedUser = await authService.getCurrentUser();
+        if (cachedUser) {
+          setUser(cachedUser);
+          setLoading(false);
+          // Silently refresh from server after UI is interactive
+          InteractionManager.runAfterInteractions(() => {
+            authService.getMe()
+              .then(response => { if (response.success) setUser(response.data); })
+              .catch(() => { /* ignore — cached data is still valid */ });
+          });
+          return;
+        }
+        // No cached user — must wait for server
         const response = await authService.getMe();
         if (response.success) {
           setUser(response.data);
         }
+      } else {
+        // No stored token — fire warmup after UI is interactive so it doesn't block startup
+        InteractionManager.runAfterInteractions(() => {
+          authService.warmup();
+        });
       }
-    } catch (error) {
-      console.error('Auth initialization error:', error);
-      await authService.logout();
+    } catch (error: any) {
+      // Only clear stored credentials on auth failures (401), not network/abort errors
+      const isNetworkIssue = !error.response && (
+        error.message === 'Network Error' ||
+        error.message === 'Aborted' ||
+        error.code === 'ERR_NETWORK' ||
+        error.code === 'ERR_CANCELED' ||
+        error.name === 'AbortError'
+      );
+      if (!isNetworkIssue) {
+        console.error('Auth initialization error:', error);
+        await authService.logout();
+      }
     } finally {
       setLoading(false);
     }
@@ -59,17 +89,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (response.success) {
       setUser(response.data);
     } else {
-      throw new Error('Login failed');
+      throw new Error((response as any).message || 'Login failed');
     }
   };
 
-  const register = async (data: RegisterData): Promise<void> => {
+  const register = async (data: RegisterData): Promise<any> => {
     const response = await authService.register(data);
-    if (response.success) {
-      setUser(response.data);
-    } else {
-      throw new Error('Registration failed');
+    if (!response.success) {
+      const msg = (response as any).message || (response as any).error || 'Registration failed';
+      throw new Error(msg);
     }
+    // Don't set user — require email verification first
+    return response;
   };
 
   const logout = async (): Promise<void> => {

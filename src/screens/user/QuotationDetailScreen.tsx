@@ -22,6 +22,7 @@ import {
 } from 'lucide-react-native';
 import { quotationService, Quotation } from '../../api';
 import { colors } from '../../theme';
+import { useTheme } from '../../contexts';
 import { Card, Button, LoadingSpinner, Badge } from '../../components/common';
 import { QuotationStatusBadge } from '../../components/quotation';
 import { MoreStackParamList } from '../../navigation/types';
@@ -32,6 +33,7 @@ export const QuotationDetailScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<RouteProps>();
   const { quotationId } = route.params;
+  const { theme } = useTheme();
 
   const [quotation, setQuotation] = useState<Quotation | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,10 +70,10 @@ export const QuotationDetailScreen: React.FC = () => {
     });
   };
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number, currency?: string) => {
     return new Intl.NumberFormat('en-PH', {
       style: 'currency',
-      currency: 'PHP',
+      currency: currency || 'PHP',
     }).format(amount);
   };
 
@@ -109,9 +111,9 @@ export const QuotationDetailScreen: React.FC = () => {
 
   if (!quotation) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Quotation not found</Text>
+          <Text style={[styles.errorText, { color: theme.textSecondary }]}>Quotation not found</Text>
           <Button title="Go Back" onPress={() => navigation.goBack()} />
         </View>
       </SafeAreaView>
@@ -119,16 +121,16 @@ export const QuotationDetailScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <ArrowLeft size={24} color={colors.gray[900]} />
+          <ArrowLeft size={24} color={theme.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Quotation Details</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Quotation Details</Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -142,45 +144,62 @@ export const QuotationDetailScreen: React.FC = () => {
         <Card style={styles.statusCard} padding="lg">
           <View style={styles.statusHeader}>
             <View style={styles.quotationInfo}>
-              <Text style={styles.quotationNumber}>{quotation.quotationNumber}</Text>
-              <Text style={styles.quotationDate}>
+              <Text style={[styles.quotationNumber, { color: theme.text }]}>{quotation.quotationNumber}</Text>
+              <Text style={[styles.quotationDate, { color: theme.textSecondary }]}>
                 Submitted on {formatDate(quotation.createdAt)}
               </Text>
             </View>
             <QuotationStatusBadge status={quotation.status} size="lg" />
           </View>
 
-          <View style={styles.statusMessage}>
+          <View style={[styles.statusMessage, { backgroundColor: theme.background }]}>
             {getStatusIcon()}
-            <Text style={styles.statusMessageText}>{getStatusMessage()}</Text>
+            <Text style={[styles.statusMessageText, { color: theme.textSecondary }]}>{getStatusMessage()}</Text>
           </View>
         </Card>
 
         {/* Pricing (if approved) */}
         {quotation.status === 'approved' && quotation.totalAmount && (
           <Card style={styles.pricingCard} padding="lg">
-            <Text style={styles.sectionTitle}>Pricing Details</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Pricing Details</Text>
 
             <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Total Amount</Text>
+              <Text style={[styles.priceLabel, { color: theme.textSecondary }]}>Total Amount</Text>
               <Text style={styles.priceValue}>
-                {formatCurrency(quotation.totalAmount)}
+                {formatCurrency(quotation.totalAmount, quotation.currency)}
               </Text>
             </View>
 
             {quotation.validUntil && (
               <View style={styles.validityRow}>
-                <Calendar size={16} color={colors.gray[500]} />
-                <Text style={styles.validityText}>
+                <Calendar size={16} color={theme.textSecondary} />
+                <Text style={[styles.validityText, { color: theme.textSecondary }]}>
                   Valid until {formatDate(quotation.validUntil)}
                 </Text>
               </View>
             )}
 
-            {quotation.terms && (
+            {(quotation.paymentTerms || quotation.deliveryTerms) && (
               <View style={styles.termsSection}>
-                <Text style={styles.termsLabel}>Terms & Conditions</Text>
-                <Text style={styles.termsText}>{quotation.terms}</Text>
+                {quotation.paymentTerms && (
+                  <>
+                    <Text style={[styles.termsLabel, { color: theme.text }]}>Payment Terms</Text>
+                    <Text style={[styles.termsText, { color: theme.textSecondary }]}>{quotation.paymentTerms}</Text>
+                  </>
+                )}
+                {quotation.deliveryTerms && (
+                  <>
+                    <Text style={[styles.termsLabel, { marginTop: quotation.paymentTerms ? 12 : 0, color: theme.text }]}>Delivery Terms</Text>
+                    <Text style={[styles.termsText, { color: theme.textSecondary }]}>{quotation.deliveryTerms}</Text>
+                  </>
+                )}
+              </View>
+            )}
+
+            {(quotation.terms || quotation.termsAndConditions) && (
+              <View style={styles.termsSection}>
+                <Text style={[styles.termsLabel, { color: theme.text }]}>Terms & Conditions</Text>
+                <Text style={[styles.termsText, { color: theme.textSecondary }]}>{quotation.termsAndConditions || quotation.terms}</Text>
               </View>
             )}
           </Card>
@@ -189,7 +208,7 @@ export const QuotationDetailScreen: React.FC = () => {
         {/* Items */}
         <Card style={styles.itemsCard} padding="lg">
           <View style={styles.itemsHeader}>
-            <Text style={styles.sectionTitle}>Items</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Items</Text>
             <Badge
               label={`${quotation.items.length} ${quotation.items.length === 1 ? 'item' : 'items'}`}
               variant="gray"
@@ -201,33 +220,41 @@ export const QuotationDetailScreen: React.FC = () => {
               key={index}
               style={[
                 styles.itemRow,
-                index < quotation.items.length - 1 && styles.itemRowBorder,
+                index < quotation.items.length - 1 && [styles.itemRowBorder, { borderBottomColor: theme.border }],
               ]}
             >
               <View style={styles.itemIcon}>
                 <Package size={20} color={colors.primary[600]} />
               </View>
               <View style={styles.itemContent}>
-                <Text style={styles.itemName}>{item.productName}</Text>
-                <Text style={styles.itemQuantity}>Quantity: {item.quantity}</Text>
+                <Text style={[styles.itemName, { color: theme.text }]}>{item.productName}</Text>
+                <Text style={[styles.itemQuantity, { color: theme.textSecondary }]}>Quantity: {item.quantity}</Text>
               </View>
             </View>
           ))}
         </Card>
 
+        {/* Additional Requirements */}
+        {quotation.additionalRequirements && (
+          <Card style={styles.notesCard} padding="lg">
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Additional Requirements</Text>
+            <Text style={[styles.notesText, { color: theme.textSecondary }]}>{quotation.additionalRequirements}</Text>
+          </Card>
+        )}
+
         {/* Notes */}
         {quotation.notes && (
           <Card style={styles.notesCard} padding="lg">
-            <Text style={styles.sectionTitle}>Your Notes</Text>
-            <Text style={styles.notesText}>{quotation.notes}</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Your Notes</Text>
+            <Text style={[styles.notesText, { color: theme.textSecondary }]}>{quotation.notes}</Text>
           </Card>
         )}
 
         {/* Admin Notes (if any) */}
         {quotation.adminNotes && (
           <Card style={styles.notesCard} padding="lg">
-            <Text style={styles.sectionTitle}>Response from Accuro</Text>
-            <Text style={styles.notesText}>{quotation.adminNotes}</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Response from Accuro</Text>
+            <Text style={[styles.notesText, { color: theme.textSecondary }]}>{quotation.adminNotes}</Text>
           </Card>
         )}
 

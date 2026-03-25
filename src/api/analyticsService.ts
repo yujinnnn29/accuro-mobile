@@ -11,39 +11,52 @@ import {
   AnalyticsSummaryResponse,
 } from '../types';
 
+// Helper to normalize API responses (handle both wrapped and unwrapped formats)
+function normalizeResponse<T>(response: any, isArray: boolean = false): { success: boolean; data: T } {
+  // If response already has success and data properties, return as-is
+  if (response && typeof response === 'object' && 'success' in response && 'data' in response) {
+    return response;
+  }
+  // Otherwise, wrap the response
+  return {
+    success: true,
+    data: response ?? (isArray ? [] : null) as T,
+  };
+}
+
 class AnalyticsService {
   // Get dashboard stats (today's bookings, pending approval, low stock, completed this month)
   async getDashboardStats(): Promise<DashboardStatsResponse> {
-    const response = await api.get<DashboardStatsResponse>('/analytics/dashboard');
-    return response.data;
+    const response = await api.get('/analytics/dashboard');
+    return normalizeResponse(response.data, false);
   }
 
   // Get today's schedule (bookings for today)
   async getTodaySchedule(): Promise<TodayScheduleResponse> {
-    const response = await api.get<TodayScheduleResponse>('/analytics/today-schedule');
-    return response.data;
+    const response = await api.get('/analytics/today-schedule');
+    return normalizeResponse(response.data, true);
   }
 
   // Get pending actions (quotations, reviews needing approval)
   async getPendingActions(): Promise<PendingActionsResponse> {
-    const response = await api.get<PendingActionsResponse>('/analytics/pending-actions');
-    return response.data;
+    const response = await api.get('/analytics/pending-actions');
+    return normalizeResponse(response.data, true);
   }
 
   // Get recent activity with optional limit
   async getRecentActivity(limit: number = 10): Promise<RecentActivityResponse> {
-    const response = await api.get<RecentActivityResponse>('/analytics/recent-activity', {
+    const response = await api.get('/analytics/recent-activity', {
       params: { limit },
     });
-    return response.data;
+    return normalizeResponse(response.data, true);
   }
 
   // Get low stock items
   async getLowStockItems(threshold?: number): Promise<LowStockResponse> {
-    const response = await api.get<LowStockResponse>('/analytics/low-stock', {
+    const response = await api.get('/analytics/low-stock', {
       params: threshold ? { threshold } : undefined,
     });
-    return response.data;
+    return normalizeResponse(response.data, true);
   }
 
   // Get booking trends for a period (7, 14, or 30 days)

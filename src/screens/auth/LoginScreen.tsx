@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -32,7 +32,22 @@ export const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [slowHint, setSlowHint] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const slowTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryCount = useRef(0);
+
+  useEffect(() => {
+    if (loading) {
+      slowTimer.current = setTimeout(() => setSlowHint(true), 8000);
+    } else {
+      if (slowTimer.current) clearTimeout(slowTimer.current);
+      setSlowHint(false);
+      setRetrying(false);
+    }
+    return () => { if (slowTimer.current) clearTimeout(slowTimer.current); };
+  }, [loading]);
 
   const validateForm = (): boolean => {
     const newErrors: { email?: string; password?: string } = {};
@@ -53,19 +68,48 @@ export const LoginScreen: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  const attemptLogin = useCallback(async (email: string, password: string): Promise<void> => {
+    await login({ email: email.trim(), password });
+  }, [login]);
+
   const handleLogin = async () => {
     if (!validateForm()) return;
 
+    retryCount.current = 0;
     setLoading(true);
-    try {
-      await login({ email: email.trim(), password });
-      // Navigation will be handled by AppNavigator based on auth state
-    } catch (error: any) {
-      const message = error.response?.data?.message || 'Login failed. Please try again.';
-      Alert.alert('Login Error', message);
-    } finally {
-      setLoading(false);
-    }
+
+    const tryLogin = async (): Promise<void> => {
+      try {
+        await attemptLogin(email, password);
+        // Navigation handled by AppNavigator based on auth state
+      } catch (error: any) {
+        const hasResponse = !!error.response;
+        const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout') || error.name === 'AbortError';
+        const isNetworkError = !hasResponse && !isTimeout;
+        const isTransient = isTimeout || isNetworkError;
+
+        // Auto-retry once on transient failures (timeout or no network response)
+        if (isTransient && retryCount.current < 1) {
+          retryCount.current += 1;
+          setRetrying(true);
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          setRetrying(false);
+          return tryLogin();
+        }
+
+        const message =
+          error.response?.data?.message ||
+          error.response?.data?.error ||
+          (isTransient ? 'The server is taking too long to respond. Please check your connection and try again.' : null) ||
+          error.message ||
+          'Login failed. Please try again.';
+        Alert.alert('Login Error', message);
+        setLoading(false);
+      }
+    };
+
+    await tryLogin();
+    setLoading(false);
   };
 
   return (
@@ -121,6 +165,13 @@ export const LoginScreen: React.FC = () => {
             fullWidth
             style={styles.loginButton}
           />
+          {slowHint && (
+            <Text style={styles.slowHint}>
+              {retrying
+                ? 'Server is waking up, retrying…'
+                : 'The server is starting up — this can take up to 2 minutes. Please wait…'}
+            </Text>
+          )}
         </View>
 
         <View style={styles.footer}>
@@ -180,6 +231,13 @@ const styles = StyleSheet.create({
   },
   loginButton: {
     marginTop: 8,
+  },
+  slowHint: {
+    marginTop: 12,
+    fontSize: 13,
+    color: colors.gray[500],
+    textAlign: 'center',
+    lineHeight: 18,
   },
   footer: {
     flexDirection: 'row',

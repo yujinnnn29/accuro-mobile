@@ -21,9 +21,11 @@ import {
 } from 'lucide-react-native';
 import { colors } from '../../theme';
 import { Card } from '../../components/common';
+import { useTheme } from '../../contexts';
 
 export const AboutScreen: React.FC = () => {
   const navigation = useNavigation();
+  const { theme } = useTheme();
 
   const services = [
     'Calibration Equipment Sales',
@@ -42,16 +44,16 @@ export const AboutScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <ArrowLeft size={24} color={colors.gray[900]} />
+          <ArrowLeft size={24} color={theme.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>About Accuro</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>About Accuro</Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -73,9 +75,9 @@ export const AboutScreen: React.FC = () => {
             <View style={[styles.iconContainer, { backgroundColor: colors.primary[100] }]}>
               <Target size={24} color={colors.primary[600]} />
             </View>
-            <Text style={styles.cardTitle}>Our Mission</Text>
+            <Text style={[styles.cardTitle, { color: theme.text }]}>Our Mission</Text>
           </View>
-          <Text style={styles.cardText}>
+          <Text style={[styles.cardText, { color: theme.textSecondary }]}>
             To provide world-class calibration solutions and exceptional service to
             industries across the Philippines, helping our clients maintain the highest
             standards of measurement accuracy and regulatory compliance.
@@ -88,9 +90,9 @@ export const AboutScreen: React.FC = () => {
             <View style={[styles.iconContainer, { backgroundColor: colors.info + '20' }]}>
               <Users size={24} color={colors.info} />
             </View>
-            <Text style={styles.cardTitle}>Who We Are</Text>
+            <Text style={[styles.cardTitle, { color: theme.text }]}>Who We Are</Text>
           </View>
-          <Text style={styles.cardText}>
+          <Text style={[styles.cardText, { color: theme.textSecondary }]}>
             Accuro is the authorized partner and distributor of Beamex calibration
             products and solutions in the Philippines. With years of experience in
             the calibration industry, we serve a wide range of sectors including
@@ -104,9 +106,9 @@ export const AboutScreen: React.FC = () => {
             <View style={[styles.iconContainer, { backgroundColor: colors.success + '20' }]}>
               <Award size={24} color={colors.success} />
             </View>
-            <Text style={styles.cardTitle}>Beamex Partnership</Text>
+            <Text style={[styles.cardTitle, { color: theme.text }]}>Beamex Partnership</Text>
           </View>
-          <Text style={styles.cardText}>
+          <Text style={[styles.cardText, { color: theme.textSecondary }]}>
             As an authorized Beamex partner, we offer the complete range of Beamex
             calibration equipment, software solutions, and professional services.
             Beamex is a leading global provider of calibration solutions, known for
@@ -128,13 +130,13 @@ export const AboutScreen: React.FC = () => {
             <View style={[styles.iconContainer, { backgroundColor: colors.warning + '20' }]}>
               <Globe size={24} color={colors.warning} />
             </View>
-            <Text style={styles.cardTitle}>Our Services</Text>
+            <Text style={[styles.cardTitle, { color: theme.text }]}>Our Services</Text>
           </View>
           <View style={styles.servicesList}>
             {services.map((service, index) => (
               <View key={index} style={styles.serviceItem}>
                 <CheckCircle size={18} color={colors.success} />
-                <Text style={styles.serviceText}>{service}</Text>
+                <Text style={[styles.serviceText, { color: theme.text }]}>{service}</Text>
               </View>
             ))}
           </View>
@@ -158,9 +160,9 @@ export const AboutScreen: React.FC = () => {
 
         {/* App Info */}
         <View style={styles.appInfo}>
-          <Text style={styles.appName}>Accuro Mobile</Text>
-          <Text style={styles.appVersion}>Version 1.0.0</Text>
-          <Text style={styles.copyright}>
+          <Text style={[styles.appName, { color: theme.text }]}>Accuro Mobile</Text>
+          <Text style={[styles.appVersion, { color: theme.textSecondary }]}>Version 1.0.0</Text>
+          <Text style={[styles.copyright, { color: theme.textSecondary }]}>
             © {new Date().getFullYear()} Accuro Philippines. All rights reserved.
           </Text>
         </View>

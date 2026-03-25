@@ -29,6 +29,7 @@ import {
 import { bookingService } from '../../api';
 import { Booking } from '../../types';
 import { colors } from '../../theme';
+import { useTheme } from '../../contexts';
 import { Card, Button, LoadingSpinner } from '../../components/common';
 import { BookingStatusBadge } from '../../components/booking';
 import { BookingsStackParamList } from '../../navigation/types';
@@ -39,6 +40,7 @@ export const BookingDetailScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<RouteProps>();
   const { bookingId } = route.params;
+  const { theme } = useTheme();
 
   const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
@@ -111,7 +113,10 @@ export const BookingDetailScreen: React.FC = () => {
     );
   };
 
-  const canCancel = booking?.status === 'pending' || booking?.status === 'confirmed';
+  const canCancel =
+    booking?.status === 'pending' ||
+    booking?.status === 'confirmed' ||
+    booking?.status === 'rescheduled';
 
   const getStatusTimeline = () => {
     const statuses = [
@@ -120,8 +125,12 @@ export const BookingDetailScreen: React.FC = () => {
       { key: 'completed', label: 'Completed', icon: CheckCircle },
     ];
 
-    const currentIndex = statuses.findIndex((s) => s.key === booking?.status);
-    const isCancelled = booking?.status === 'cancelled';
+    const status = booking?.status;
+    // For rescheduled/pending_review, highlight the confirmed step as current
+    const effectiveStatus =
+      status === 'rescheduled' || status === 'pending_review' ? 'confirmed' : status;
+    const currentIndex = statuses.findIndex((s) => s.key === effectiveStatus);
+    const isCancelled = status === 'cancelled';
 
     return { statuses, currentIndex, isCancelled };
   };
@@ -132,9 +141,9 @@ export const BookingDetailScreen: React.FC = () => {
 
   if (!booking) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Booking not found</Text>
+          <Text style={[styles.errorText, { color: theme.textSecondary }]}>Booking not found</Text>
           <Button title="Go Back" onPress={() => navigation.goBack()} />
         </View>
       </SafeAreaView>
@@ -144,16 +153,16 @@ export const BookingDetailScreen: React.FC = () => {
   const { statuses, currentIndex, isCancelled } = getStatusTimeline();
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <ArrowLeft size={24} color={colors.gray[900]} />
+          <ArrowLeft size={24} color={theme.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Booking Details</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Booking Details</Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -166,7 +175,7 @@ export const BookingDetailScreen: React.FC = () => {
         {/* Status Card */}
         <Card style={styles.statusCard} padding="lg">
           <View style={styles.statusHeader}>
-            <Text style={styles.statusLabel}>Status</Text>
+            <Text style={[styles.statusLabel, { color: theme.text }]}>Status</Text>
             <BookingStatusBadge status={booking.status} size="lg" />
           </View>
 
@@ -205,6 +214,7 @@ export const BookingDetailScreen: React.FC = () => {
                     <Text
                       style={[
                         styles.timelineLabel,
+                        { color: theme.textSecondary },
                         isCompleted && styles.timelineLabelCompleted,
                       ]}
                     >
@@ -224,103 +234,136 @@ export const BookingDetailScreen: React.FC = () => {
               </Text>
             </View>
           )}
+
+          {booking.status === 'pending_review' && (
+            <View style={styles.reviewNote}>
+              <AlertTriangle size={20} color={colors.warning} />
+              <Text style={styles.reviewNoteText}>
+                This booking is under review by our team
+              </Text>
+            </View>
+          )}
         </Card>
 
         {/* Booking Info */}
         <Card style={styles.infoCard} padding="lg">
-          <Text style={styles.sectionTitle}>Booking Information</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Booking Information</Text>
 
-          <View style={styles.infoRow}>
+          <View style={[styles.infoRow, { borderBottomColor: theme.border }]}>
             <View style={styles.infoIcon}>
               <Calendar size={18} color={colors.primary[600]} />
             </View>
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Date</Text>
-              <Text style={styles.infoValue}>{formatDate(booking.date)}</Text>
+              <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>Date</Text>
+              <Text style={[styles.infoValue, { color: theme.text }]}>{formatDate(booking.date)}</Text>
             </View>
           </View>
 
-          <View style={styles.infoRow}>
+          <View style={[styles.infoRow, { borderBottomColor: theme.border }]}>
             <View style={styles.infoIcon}>
               <Clock size={18} color={colors.primary[600]} />
             </View>
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Time</Text>
-              <Text style={styles.infoValue}>{formatTime(booking.time)}</Text>
+              <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>Time</Text>
+              <Text style={[styles.infoValue, { color: theme.text }]}>{formatTime(booking.time)}</Text>
             </View>
           </View>
 
-          <View style={styles.infoRow}>
+          <View style={[styles.infoRow, { borderBottomColor: theme.border }]}>
             <View style={styles.infoIcon}>
               <MapPin size={18} color={colors.primary[600]} />
             </View>
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Location</Text>
-              <Text style={styles.infoValue}>{booking.location}</Text>
+              <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>Location</Text>
+              <Text style={[styles.infoValue, { color: theme.text }]}>{booking.location}</Text>
             </View>
           </View>
 
-          <View style={styles.infoRow}>
+          <View style={[styles.infoRow, { borderBottomColor: theme.border }]}>
             <View style={styles.infoIcon}>
               <FileText size={18} color={colors.primary[600]} />
             </View>
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Purpose</Text>
-              <Text style={styles.infoValue}>{booking.purpose}</Text>
+              <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>Purpose</Text>
+              <Text style={[styles.infoValue, { color: theme.text }]}>{booking.purpose}</Text>
             </View>
           </View>
 
           {booking.product && (
-            <View style={styles.infoRow}>
+            <View style={[styles.infoRow, { borderBottomColor: theme.border }]}>
               <View style={styles.infoIcon}>
                 <Package size={18} color={colors.primary[600]} />
               </View>
               <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Product Interest</Text>
-                <Text style={styles.infoValue}>{booking.product}</Text>
+                <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>Product Interest</Text>
+                <Text style={[styles.infoValue, { color: theme.text }]}>{booking.product}</Text>
               </View>
             </View>
           )}
 
           {booking.additionalInfo && (
-            <View style={styles.notesSection}>
-              <Text style={styles.notesLabel}>Additional Notes</Text>
-              <Text style={styles.notesText}>{booking.additionalInfo}</Text>
+            <View style={[styles.notesSection, { backgroundColor: theme.background }]}>
+              <Text style={[styles.notesLabel, { color: theme.textSecondary }]}>Additional Notes</Text>
+              <Text style={[styles.notesText, { color: theme.text }]}>{booking.additionalInfo}</Text>
+            </View>
+          )}
+
+          {booking.status === 'rescheduled' && booking.originalDate && (
+            <View style={styles.rescheduleSection}>
+              <View style={styles.rescheduleSectionHeader}>
+                <RefreshCw size={16} color={colors.warning} />
+                <Text style={styles.rescheduleTitle}>Rescheduled</Text>
+              </View>
+              <Text style={styles.rescheduleLabel}>Original Date</Text>
+              <Text style={styles.rescheduleValue}>{formatDate(booking.originalDate)}{booking.originalTime ? ` at ${formatTime(booking.originalTime)}` : ''}</Text>
+              {booking.rescheduleReason && (
+                <>
+                  <Text style={[styles.rescheduleLabel, { marginTop: 8 }]}>Reason</Text>
+                  <Text style={styles.rescheduleValue}>{booking.rescheduleReason}</Text>
+                </>
+              )}
+            </View>
+          )}
+
+          {booking.status === 'completed' && booking.conclusion && (
+            <View style={styles.conclusionSection}>
+              <Text style={[styles.notesLabel, { color: theme.textSecondary }]}>Meeting Conclusion</Text>
+              <Text style={[styles.notesText, { color: theme.text }]}>{booking.conclusion}</Text>
             </View>
           )}
         </Card>
 
         {/* Contact Info */}
         <Card style={styles.infoCard} padding="lg">
-          <Text style={styles.sectionTitle}>Contact Information</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Contact Information</Text>
 
-          <View style={styles.infoRow}>
+          <View style={[styles.infoRow, { borderBottomColor: theme.border }]}>
             <View style={styles.infoIcon}>
               <User size={18} color={colors.primary[600]} />
             </View>
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Name</Text>
-              <Text style={styles.infoValue}>{booking.contactName}</Text>
+              <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>Name</Text>
+              <Text style={[styles.infoValue, { color: theme.text }]}>{booking.contactName}</Text>
             </View>
           </View>
 
-          <View style={styles.infoRow}>
+          <View style={[styles.infoRow, { borderBottomColor: theme.border }]}>
             <View style={styles.infoIcon}>
               <Building2 size={18} color={colors.primary[600]} />
             </View>
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Company</Text>
-              <Text style={styles.infoValue}>{booking.company}</Text>
+              <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>Company</Text>
+              <Text style={[styles.infoValue, { color: theme.text }]}>{booking.company}</Text>
             </View>
           </View>
 
-          <View style={styles.infoRow}>
+          <View style={[styles.infoRow, { borderBottomColor: theme.border }]}>
             <View style={styles.infoIcon}>
               <Mail size={18} color={colors.primary[600]} />
             </View>
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Email</Text>
-              <Text style={styles.infoValue}>{booking.contactEmail}</Text>
+              <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>Email</Text>
+              <Text style={[styles.infoValue, { color: theme.text }]}>{booking.contactEmail}</Text>
             </View>
           </View>
 
@@ -329,8 +372,8 @@ export const BookingDetailScreen: React.FC = () => {
               <Phone size={18} color={colors.primary[600]} />
             </View>
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Phone</Text>
-              <Text style={styles.infoValue}>{booking.contactPhone}</Text>
+              <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>Phone</Text>
+              <Text style={[styles.infoValue, { color: theme.text }]}>{booking.contactPhone}</Text>
             </View>
           </View>
         </Card>
@@ -466,6 +509,21 @@ const styles = StyleSheet.create({
     color: colors.error,
     fontWeight: '500',
   },
+  reviewNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.warning + '10',
+    padding: 12,
+    borderRadius: 8,
+    gap: 8,
+    marginTop: 12,
+  },
+  reviewNoteText: {
+    fontSize: 14,
+    color: colors.warning,
+    fontWeight: '500',
+    flex: 1,
+  },
   infoCard: {
     marginHorizontal: 16,
     marginTop: 8,
@@ -524,6 +582,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.gray[700],
     lineHeight: 20,
+  },
+  rescheduleSection: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: colors.warning + '10',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.warning,
+  },
+  rescheduleSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  rescheduleTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.warning,
+  },
+  rescheduleLabel: {
+    fontSize: 12,
+    color: colors.gray[500],
+    marginBottom: 2,
+  },
+  rescheduleValue: {
+    fontSize: 14,
+    color: colors.gray[700],
+    fontWeight: '500',
+  },
+  conclusionSection: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: colors.success + '10',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.success,
   },
   actionsSection: {
     padding: 16,

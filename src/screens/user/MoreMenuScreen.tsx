@@ -18,13 +18,21 @@ import {
   ChevronRight,
   LogOut,
   Settings,
+  LayoutDashboard,
+  Activity,
+  Moon,
 } from 'lucide-react-native';
-import { useAuth } from '../../contexts';
+import { useAuth, useTheme } from '../../contexts';
 import { colors } from '../../theme';
+import { Switch } from 'react-native';
 import { Card, Badge } from '../../components/common';
-import { MoreStackParamList } from '../../navigation/types';
+import { MoreStackParamList, RootMainParamList } from '../../navigation/types';
+import { CompositeNavigationProp } from '@react-navigation/native';
 
-type NavigationProp = NativeStackNavigationProp<MoreStackParamList>;
+type NavigationProp = CompositeNavigationProp<
+  NativeStackNavigationProp<MoreStackParamList>,
+  NativeStackNavigationProp<RootMainParamList>
+>;
 
 interface MenuItem {
   icon: React.FC<any>;
@@ -36,7 +44,13 @@ interface MenuItem {
 
 export const MoreMenuScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
+  const { theme, isDark, toggleTheme } = useTheme();
+
+  const handleAdminDashboard = () => {
+    // Navigate to admin panel using the root navigator
+    navigation.getParent()?.getParent()?.navigate('AdminPanel' as never);
+  };
 
   const menuItems: MenuItem[] = [
     {
@@ -44,6 +58,12 @@ export const MoreMenuScreen: React.FC = () => {
       label: 'My Profile',
       description: 'Manage your account settings',
       screen: 'Profile',
+    },
+    {
+      icon: FileText,
+      label: 'Request a Quote',
+      description: 'Submit a new quotation request',
+      screen: 'RequestQuote',
     },
     {
       icon: FileText,
@@ -56,6 +76,12 @@ export const MoreMenuScreen: React.FC = () => {
       label: 'Testimonials',
       description: 'Read and write reviews',
       screen: 'Testimonials',
+    },
+    {
+      icon: Activity,
+      label: 'Activity Log',
+      description: 'View your account activity history',
+      screen: 'AccountHistory',
     },
     {
       icon: Phone,
@@ -80,11 +106,11 @@ export const MoreMenuScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* User Profile Card */}
         <TouchableOpacity
-          style={styles.profileCard}
+          style={[styles.profileCard, { backgroundColor: theme.surface }]}
           onPress={() => handleMenuPress('Profile')}
           activeOpacity={0.7}
         >
@@ -92,8 +118,8 @@ export const MoreMenuScreen: React.FC = () => {
             <User size={32} color={colors.white} />
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{user?.name}</Text>
-            <Text style={styles.profileEmail}>{user?.email}</Text>
+            <Text style={[styles.profileName, { color: theme.text }]}>{user?.name}</Text>
+            <Text style={[styles.profileEmail, { color: theme.textSecondary }]}>{user?.email}</Text>
             <Badge
               label={user?.role === 'superadmin' ? 'Super Admin' : user?.role === 'admin' ? 'Admin' : 'User'}
               variant="info"
@@ -104,16 +130,42 @@ export const MoreMenuScreen: React.FC = () => {
           <ChevronRight size={20} color={colors.gray[400]} />
         </TouchableOpacity>
 
+        {/* Admin Dashboard - Only visible for admin users */}
+        {isAdmin && (
+          <View style={styles.adminSection}>
+            <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>Administration</Text>
+            <Card padding="none" style={styles.menuCard}>
+              <TouchableOpacity
+                style={[styles.adminMenuItem, { backgroundColor: theme.surface }]}
+                onPress={handleAdminDashboard}
+                activeOpacity={0.7}
+              >
+                <View style={styles.adminIconContainer}>
+                  <LayoutDashboard size={22} color={colors.white} />
+                </View>
+                <View style={styles.menuContent}>
+                  <Text style={[styles.menuLabel, { color: theme.text }]}>Admin Dashboard</Text>
+                  <Text style={[styles.menuDescription, { color: theme.textSecondary }]}>
+                    Manage bookings, products, users & more
+                  </Text>
+                </View>
+                <ChevronRight size={18} color={colors.gray[400]} />
+              </TouchableOpacity>
+            </Card>
+          </View>
+        )}
+
         {/* Menu Items */}
         <View style={styles.menuSection}>
-          <Text style={styles.sectionTitle}>Account</Text>
+          <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>Account</Text>
           <Card padding="none" style={styles.menuCard}>
             {menuItems.map((item, index) => (
               <TouchableOpacity
                 key={index}
                 style={[
                   styles.menuItem,
-                  index < menuItems.length - 1 && styles.menuItemBorder,
+                  { backgroundColor: theme.surface },
+                  index < menuItems.length - 1 && [styles.menuItemBorder, { borderBottomColor: theme.border }],
                 ]}
                 onPress={() => handleMenuPress(item.screen)}
                 activeOpacity={0.7}
@@ -122,9 +174,9 @@ export const MoreMenuScreen: React.FC = () => {
                   <item.icon size={22} color={colors.primary[600]} />
                 </View>
                 <View style={styles.menuContent}>
-                  <Text style={styles.menuLabel}>{item.label}</Text>
+                  <Text style={[styles.menuLabel, { color: theme.text }]}>{item.label}</Text>
                   {item.description && (
-                    <Text style={styles.menuDescription}>{item.description}</Text>
+                    <Text style={[styles.menuDescription, { color: theme.textSecondary }]}>{item.description}</Text>
                   )}
                 </View>
                 {item.badge && (
@@ -136,10 +188,32 @@ export const MoreMenuScreen: React.FC = () => {
           </Card>
         </View>
 
+        {/* Dark Mode Toggle */}
+        <View style={styles.menuSection}>
+          <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>Preferences</Text>
+          <Card padding="none" style={styles.menuCard}>
+            <View style={[styles.menuItem, { backgroundColor: theme.surface }]}>
+              <View style={styles.menuIconContainer}>
+                <Moon size={22} color={colors.primary[600]} />
+              </View>
+              <View style={styles.menuContent}>
+                <Text style={[styles.menuLabel, { color: theme.text }]}>Dark Mode</Text>
+                <Text style={[styles.menuDescription, { color: theme.textSecondary }]}>Switch to dark theme</Text>
+              </View>
+              <Switch
+                value={isDark}
+                onValueChange={toggleTheme}
+                trackColor={{ false: colors.gray[300], true: colors.primary[500] }}
+                thumbColor={colors.white}
+              />
+            </View>
+          </Card>
+        </View>
+
         {/* Logout Button */}
         <View style={styles.logoutSection}>
           <TouchableOpacity
-            style={styles.logoutButton}
+            style={[styles.logoutButton, { backgroundColor: theme.surface }]}
             onPress={handleLogout}
             activeOpacity={0.7}
           >
@@ -149,7 +223,7 @@ export const MoreMenuScreen: React.FC = () => {
         </View>
 
         {/* App Version */}
-        <Text style={styles.version}>Accuro Mobile v1.0.0</Text>
+        <Text style={[styles.version, { color: theme.textSecondary }]}>Accuro Mobile v1.0.0</Text>
 
         <View style={styles.bottomPadding} />
       </ScrollView>
@@ -199,6 +273,24 @@ const styles = StyleSheet.create({
   },
   roleBadge: {
     marginTop: 8,
+  },
+  adminSection: {
+    paddingHorizontal: 16,
+    marginTop: 16,
+  },
+  adminMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: colors.white,
+  },
+  adminIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary[600],
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   menuSection: {
     paddingHorizontal: 16,

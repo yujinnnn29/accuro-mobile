@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,212 +7,948 @@ import {
   Image,
   TouchableOpacity,
   Dimensions,
+  StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Shield, Users, Award, ChevronRight } from 'lucide-react-native';
-import { getFeaturedProducts } from '../../data/products';
+import {
+  CheckCircle,
+  Users,
+  TrendingUp,
+  ChevronRight,
+  Phone,
+  Mail,
+  MapPin,
+  Bell,
+  Award,
+  Building2,
+  UserCheck,
+  Search,
+  FileText,
+  ClipboardList,
+  ArrowRight,
+} from 'lucide-react-native';
+import { useAuth, useNotifications, useTheme } from '../../contexts';
+import { productService } from '../../api';
 import { colors } from '../../theme';
 import { Product } from '../../types';
 
 const { width } = Dimensions.get('window');
 
-const ValueCard: React.FC<{ icon: React.ReactNode; title: string; description: string }> = ({
-  icon,
-  title,
-  description,
-}) => (
-  <View style={styles.valueCard}>
-    <View style={styles.valueIcon}>{icon}</View>
-    <Text style={styles.valueTitle}>{title}</Text>
-    <Text style={styles.valueDescription}>{description}</Text>
+// Feature Badge Component
+const FeatureBadge: React.FC<{
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  isLast?: boolean;
+}> = ({ icon, title, subtitle, isLast }) => (
+  <View style={[styles.featureBadge, isLast && { borderBottomWidth: 0 }]}>
+    <View style={styles.featureBadgeIcon}>{icon}</View>
+    <View style={{ flex: 1 }}>
+      <Text style={styles.featureBadgeTitle}>{title}</Text>
+      <Text style={styles.featureBadgeSubtitle}>{subtitle}</Text>
+    </View>
   </View>
 );
 
-const ProductCard: React.FC<{ product: Product; onPress: () => void }> = ({ product, onPress }) => (
-  <TouchableOpacity style={styles.productCard} onPress={onPress} activeOpacity={0.7}>
-    <Image source={{ uri: product.image }} style={styles.productImage} resizeMode="contain" />
-    <View style={styles.productInfo}>
-      <Text style={styles.productCategory}>{product.category}</Text>
-      <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
-      <Text style={styles.productPrice}>{product.priceRange}</Text>
+// Partner Card Component
+const PartnerCard: React.FC<{
+  image: any;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}> = ({ image, icon, title, description }) => {
+  const { theme } = useTheme();
+  return (
+    <View style={[styles.partnerCard, { backgroundColor: theme.surface }]}>
+      <Image source={image} style={styles.partnerImage} resizeMode="cover" />
+      <View style={styles.partnerContent}>
+        <View style={styles.partnerTitleRow}>
+          {icon}
+          <Text style={[styles.partnerTitle, { color: theme.text }]}>{title}</Text>
+        </View>
+        <Text style={[styles.partnerDescription, { color: theme.textSecondary }]}>{description}</Text>
+      </View>
     </View>
-  </TouchableOpacity>
-);
+  );
+};
+
+// Product Card Component
+const ProductCard: React.FC<{
+  product: Product;
+  onPress: () => void;
+}> = ({ product, onPress }) => {
+  const { theme } = useTheme();
+  return (
+    <TouchableOpacity style={[styles.productCard, { backgroundColor: theme.surface }]} onPress={onPress} activeOpacity={0.7}>
+      <View style={[styles.productImageContainer, { backgroundColor: theme.background }]}>
+        <Image
+          source={{ uri: product.image }}
+          style={styles.productImage}
+          resizeMode="contain"
+        />
+      </View>
+      <View style={styles.productInfo}>
+        <Text style={[styles.productName, { color: theme.text }]} numberOfLines={1}>{product.name}</Text>
+        <Text style={[styles.productDescription, { color: theme.textSecondary }]} numberOfLines={1}>
+          {product.description}
+        </Text>
+        <TouchableOpacity style={styles.viewDetailsLink} onPress={onPress}>
+          <Text style={styles.viewDetailsText}>View details</Text>
+          <ChevronRight size={16} color={colors.primary[600]} />
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
+};
 
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const featuredProducts = getFeaturedProducts(4);
+  const { user, isAdmin } = useAuth();
+  const { unreadCount: notificationCount, refreshUnreadCount } = useNotifications();
+  const { theme } = useTheme();
+  const [products, setProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    loadProducts();
+    refreshUnreadCount();
+  }, []);
+
+  const loadProducts = async () => {
+    try {
+      const response = await productService.getProducts({ limit: 4 });
+      setProducts(response.data || []);
+    } catch (error) {
+      console.error('Error loading products:', error);
+    }
+  };
+
+  const getUserInitials = () => {
+    if (!user?.name) return 'U';
+    const names = user.name.split(' ');
+    if (names.length >= 2) {
+      return `${names[0][0]}${names[1][0]}`.toUpperCase();
+    }
+    return user.name.substring(0, 2).toUpperCase();
+  };
+
+  const handleUserPress = () => {
+    if (isAdmin) {
+      navigation.getParent()?.navigate('AdminPanel');
+    } else {
+      navigation.getParent()?.navigate('MoreTab', { screen: 'Profile' });
+    }
+  };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Hero Section */}
-      <View style={styles.hero}>
-        <Text style={styles.heroTitle}>Precision Calibration Solutions</Text>
-        <Text style={styles.heroSubtitle}>
-          Your trusted partner for Beamex calibration equipment in the Philippines
-        </Text>
-        <TouchableOpacity
-          style={styles.heroButton}
-          onPress={() => navigation.navigate('Products')}
-        >
-          <Text style={styles.heroButtonText}>Explore Products</Text>
-          <ChevronRight size={20} color={colors.white} />
-        </TouchableOpacity>
-      </View>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.navy[900]} />
 
-      {/* Value Propositions */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Why Choose Accuro</Text>
-        <View style={styles.valueGrid}>
-          <ValueCard
-            icon={<Shield size={28} color={colors.primary[600]} />}
-            title="Certified Quality"
-            description="ISO-certified calibration equipment from Beamex"
-          />
-          <ValueCard
-            icon={<Users size={28} color={colors.primary[600]} />}
-            title="Expert Support"
-            description="Dedicated technical team for your needs"
-          />
-          <ValueCard
-            icon={<Award size={28} color={colors.primary[600]} />}
-            title="Industry Leader"
-            description="30+ years of calibration excellence"
-          />
+      {/* Header */}
+      <SafeAreaView edges={['top']} style={styles.headerSafeArea}>
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.logo}>accuro</Text>
+          </View>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={styles.notificationButton}
+              onPress={() => navigation.getParent()?.navigate('NotificationsTab')}
+            >
+              <Bell size={22} color={colors.white} />
+              {notificationCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>{notificationCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.userAvatar} onPress={handleUserPress}>
+              <Text style={styles.userAvatarText}>{getUserInitials()}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      </SafeAreaView>
 
-      {/* Featured Products */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Featured Products</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Products')}>
-            <Text style={styles.viewAllText}>View All</Text>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Hero Section */}
+        <View style={styles.hero}>
+          <View style={styles.heroBadge}>
+            <Text style={styles.heroBadgeText}>Industry-Leading Calibration Solutions</Text>
+          </View>
+          <Text style={styles.heroTitle}>
+            Instrumentation & Calibration Solutions
+          </Text>
+          <Text style={styles.heroSubtitle}>
+            Providing high-quality measurement and calibration equipment for industrial applications with precision and reliability
+          </Text>
+          <View style={styles.heroButtons}>
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={() => navigation.navigate('Products')}
+            >
+              <Text style={styles.primaryButtonText}>Explore Products</Text>
+              <ChevronRight size={18} color={colors.white} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.heroBookButton}
+              onPress={() => navigation.navigate('Booking', {})}
+            >
+              <Text style={styles.heroBookButtonText}>Book Meeting</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            style={styles.heroQuoteButton}
+            onPress={() => navigation.navigate('RequestQuote')}
+          >
+            <FileText size={16} color={colors.white} />
+            <Text style={styles.heroQuoteButtonText}>Request a Quote</Text>
+          </TouchableOpacity>
+
+          {/* Feature Badges */}
+          <View style={styles.featureBadges}>
+            <FeatureBadge
+              icon={<CheckCircle size={18} color={colors.primary[400]} />}
+              title="Certified Quality"
+              subtitle="ISO-compliant solutions"
+            />
+            <FeatureBadge
+              icon={<Users size={18} color={colors.primary[400]} />}
+              title="Expert Support"
+              subtitle="Dedicated technical team"
+            />
+            <FeatureBadge
+              icon={<TrendingUp size={18} color={colors.primary[400]} />}
+              title="Industry Leader"
+              subtitle="Trusted by top companies"
+              isLast
+            />
+          </View>
+        </View>
+
+        {/* How It Works Section */}
+        <View style={[styles.howItWorksSection, { backgroundColor: theme.surface }]}>
+          <Text style={[styles.howItWorksTitle, { color: theme.text }]}>How It Works</Text>
+          <Text style={[styles.howItWorksSubtitle, { color: theme.textSecondary }]}>
+            Getting the right calibration solution is simple
+          </Text>
+          <View style={styles.stepsContainer}>
+            {[
+              {
+                icon: <Search size={28} color={colors.primary[600]} />,
+                title: 'Browse Our Products',
+                desc: 'Explore our comprehensive range of Beamex calibration equipment and find the right solution for your needs.',
+              },
+              {
+                icon: <FileText size={28} color={colors.primary[600]} />,
+                title: 'Request a Quote or Book a Consultation',
+                desc: 'Add products to your quote list and submit a request, or schedule a meeting with our experts.',
+              },
+              {
+                icon: <ClipboardList size={28} color={colors.primary[600]} />,
+                title: 'Get Your Custom Quote',
+                desc: "Our team will review your requirements and prepare a detailed quotation tailored to your business.",
+              },
+            ].map((step, i) => (
+              <View key={i} style={styles.step}>
+                <View style={styles.stepNumberBadge}>
+                  <Text style={styles.stepNumber}>{i + 1}</Text>
+                </View>
+                {i < 2 && <View style={styles.stepConnector} />}
+                <View style={styles.stepIconCircle}>{step.icon}</View>
+                <Text style={[styles.stepTitle, { color: theme.text }]}>{step.title}</Text>
+                <Text style={[styles.stepDesc, { color: theme.textSecondary }]}>{step.desc}</Text>
+              </View>
+            ))}
+          </View>
+          <TouchableOpacity
+            style={styles.getStartedButton}
+            onPress={() => navigation.navigate('Products')}
+          >
+            <Text style={styles.getStartedButtonText}>Get Started</Text>
+            <ArrowRight size={18} color={colors.white} />
           </TouchableOpacity>
         </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.productsScroll}
-        >
-          {featuredProducts.map((product) => (
-            <ProductCard
-              key={product._id}
-              product={product}
-              onPress={() => navigation.navigate('ProductDetail', { productId: product._id })}
+
+        {/* About Section */}
+        <View style={styles.aboutSection}>
+          <View style={styles.aboutBadge}>
+            <Text style={styles.aboutBadgeText}>About Accuro</Text>
+          </View>
+          <Text style={styles.aboutTitle}>Who We Are</Text>
+          <Text style={styles.aboutText}>
+            Accuro is a leading provider of high-quality instrumentation and calibration solutions for various industries. We specialize in Beamex products, offering the best measurement and calibration equipment to ensure accuracy and reliability in your operations.
+          </Text>
+          <Text style={styles.aboutText}>
+            With years of experience and expertise, we help our clients optimize their processes, improve efficiency, and maintain compliance with industry standards.
+          </Text>
+          <TouchableOpacity
+            style={styles.learnMoreLink}
+            onPress={() => navigation.getParent()?.navigate('MoreTab', { screen: 'About' })}
+          >
+            <Text style={styles.learnMoreText}>Learn more about us</Text>
+            <ChevronRight size={16} color={colors.primary[600]} />
+          </TouchableOpacity>
+          <Image
+            source={{ uri: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=800' }}
+            style={styles.aboutImage}
+            resizeMode="cover"
+          />
+        </View>
+
+        {/* Partners Section */}
+        <View style={[styles.partnersSection, { backgroundColor: theme.surface }]}>
+          <View style={styles.partnersBadge}>
+            <Text style={styles.partnersBadgeText}>Our Partners</Text>
+          </View>
+          <Text style={[styles.partnersTitle, { color: theme.text }]}>Backed by Industry Leaders</Text>
+          <Text style={[styles.partnersSubtitle, { color: theme.textSecondary }]}>
+            Partnering with the best to deliver exceptional calibration solutions
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.partnersScroll}
+          >
+            <PartnerCard
+              image={{ uri: 'https://images.unsplash.com/photo-1581092921461-eab62e97a780?w=400' }}
+              icon={<Award size={16} color={colors.primary[600]} />}
+              title="Official Distributor"
+              description="Official distributor of Beamex calibration equipment and software solutions"
             />
-          ))}
-        </ScrollView>
-      </View>
+            <PartnerCard
+              image={{ uri: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400' }}
+              icon={<Building2 size={16} color={colors.primary[600]} />}
+              title="Strategic Partners"
+              description="Partnered with leading industrial automation companies"
+            />
+            <PartnerCard
+              image={{ uri: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=400' }}
+              icon={<UserCheck size={16} color={colors.primary[600]} />}
+              title="Certified Experts"
+              description="Certified experts in measurement and calibration technologies"
+            />
+          </ScrollView>
+        </View>
 
-      {/* About Section */}
-      <View style={[styles.section, styles.aboutSection]}>
-        <Text style={styles.sectionTitle}>About Accuro</Text>
-        <Text style={styles.aboutText}>
-          Accuro is the official distributor of Beamex calibration solutions in the Philippines.
-          We provide world-class calibration equipment, software, and services to industries
-          including oil & gas, pharmaceutical, power generation, and manufacturing.
-        </Text>
-        <TouchableOpacity
-          style={styles.learnMoreButton}
-          onPress={() => navigation.navigate('About')}
-        >
-          <Text style={styles.learnMoreText}>Learn More About Us</Text>
-        </TouchableOpacity>
-      </View>
+        {/* Products Section */}
+        <View style={[styles.productsSection, { backgroundColor: theme.surface }]}>
+          <View style={styles.productsBadge}>
+            <Text style={styles.productsBadgeText}>Product Catalog</Text>
+          </View>
+          <Text style={[styles.productsTitle, { color: theme.text }]}>Our Products</Text>
+          <Text style={[styles.productsSubtitle, { color: theme.textSecondary }]}>
+            We offer a comprehensive range of Beamex calibration equipment and accessories for various industrial applications
+          </Text>
+          <View style={styles.productsGrid}>
+            {products.map((product) => (
+              <ProductCard
+                key={product._id}
+                product={product}
+                onPress={() => navigation.navigate('ProductDetail', { productId: product._id })}
+              />
+            ))}
+          </View>
+          <TouchableOpacity
+            style={styles.viewAllButton}
+            onPress={() => navigation.navigate('Products')}
+          >
+            <Text style={styles.viewAllButtonText}>View All Products</Text>
+            <ChevronRight size={18} color={colors.white} />
+          </TouchableOpacity>
+        </View>
 
-      {/* CTA Section */}
-      <View style={styles.ctaSection}>
-        <Text style={styles.ctaTitle}>Ready to Get Started?</Text>
-        <Text style={styles.ctaSubtitle}>
-          Schedule a consultation or product demonstration with our experts
-        </Text>
-        <TouchableOpacity
-          style={styles.ctaButton}
-          onPress={() => navigation.navigate('Booking')}
-        >
-          <Text style={styles.ctaButtonText}>Book a Meeting</Text>
-        </TouchableOpacity>
-      </View>
+        {/* CTA Section */}
+        <View style={styles.ctaSection}>
+          <Text style={styles.ctaTitle}>Ready to Get Started?</Text>
+          <Text style={styles.ctaSubtitle}>
+            Know what you need? Request a quote. Not sure yet? Book a free consultation with our experts.
+          </Text>
+          <View style={styles.ctaButtons}>
+            <TouchableOpacity
+              style={styles.ctaBrowseButton}
+              onPress={() => navigation.navigate('Products')}
+            >
+              <Text style={styles.ctaBrowseButtonText}>Browse Products</Text>
+              <ArrowRight size={16} color={colors.white} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.ctaQuoteButton}
+              onPress={() => navigation.navigate('RequestQuote')}
+            >
+              <Text style={styles.ctaQuoteButtonText}>Request a Quote</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.ctaBookButton}
+              onPress={() => navigation.navigate('Booking', {})}
+            >
+              <Text style={styles.ctaBookButtonText}>Book a Consultation</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>© 2025 Accuro. All rights reserved.</Text>
-      </View>
-    </ScrollView>
+        {/* Footer */}
+        <View style={styles.footer}>
+          <View style={styles.footerTop}>
+            <View style={styles.footerBrand}>
+              <Text style={styles.footerLogo}>accuro</Text>
+              <Text style={styles.footerBrandText}>
+                Providing high-quality instrumentation and calibration solutions for your industrial needs.
+              </Text>
+            </View>
+            <View style={styles.footerLinks}>
+              <Text style={styles.footerLinksTitle}>Quick Links</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Home')}>
+                <Text style={styles.footerLink}>Home</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => navigation.navigate('Products')}>
+                <Text style={styles.footerLink}>Products</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => navigation.getParent()?.navigate('MoreTab', { screen: 'About' })}>
+                <Text style={styles.footerLink}>About Us</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => navigation.getParent()?.navigate('MoreTab', { screen: 'Contact' })}>
+                <Text style={styles.footerLink}>Contact Us</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.footerContact}>
+              <Text style={styles.footerContactTitle}>Contact Information</Text>
+              <View style={styles.footerContactItem}>
+                <Phone size={14} color={colors.gray[400]} />
+                <Text style={styles.footerContactText}>+63 9171507737</Text>
+              </View>
+              <View style={styles.footerContactItem}>
+                <Mail size={14} color={colors.gray[400]} />
+                <Text style={styles.footerContactText}>info@accuro.com.ph</Text>
+              </View>
+              <View style={styles.footerContactItem}>
+                <MapPin size={14} color={colors.gray[400]} />
+                <Text style={styles.footerContactText}>
+                  Unit 2229, Viera Residences, Scout Tuason Avenue, Barangay Obrero, Quezon City
+                </Text>
+              </View>
+            </View>
+          </View>
+          <View style={styles.footerBottom}>
+            <Text style={styles.footerCopyright}>© 2026 Accuro. All rights reserved.</Text>
+          </View>
+        </View>
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.white,
+    backgroundColor: colors.navy[900],
   },
-  hero: {
-    backgroundColor: colors.primary[600],
-    paddingHorizontal: 24,
-    paddingTop: 60,
-    paddingBottom: 40,
+  headerSafeArea: {
+    backgroundColor: colors.navy[900],
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: colors.navy[900],
+  },
+  headerLeft: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  heroTitle: {
+  logo: {
     fontSize: 28,
     fontWeight: 'bold',
+    color: colors.primary[500],
+    fontStyle: 'italic',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  notificationButton: {
+    position: 'relative',
+    padding: 8,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: colors.error,
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notificationBadgeText: {
     color: colors.white,
-    textAlign: 'center',
-    marginBottom: 12,
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  userAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primary[500],
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.primary[300],
+  },
+  userAvatarText: {
+    color: colors.white,
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  hero: {
+    backgroundColor: colors.navy[900],
+    paddingHorizontal: 24,
+    paddingTop: 40,
+    paddingBottom: 32,
+  },
+  heroBadge: {
+    backgroundColor: colors.primary[600],
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+    marginBottom: 20,
+  },
+  heroBadgeText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  heroTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: colors.white,
+    marginBottom: 16,
+    lineHeight: 40,
   },
   heroSubtitle: {
     fontSize: 16,
-    color: colors.primary[100],
-    textAlign: 'center',
-    marginBottom: 24,
+    color: colors.gray[300],
     lineHeight: 24,
+    marginBottom: 24,
   },
-  heroButton: {
+  heroButtons: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  primaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: colors.primary[600],
+    paddingHorizontal: 18,
     paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
+    borderRadius: 6,
+    gap: 6,
+    flex: 1,
+    justifyContent: 'center',
   },
-  heroButtonText: {
-    fontSize: 16,
+  primaryButtonText: {
+    color: colors.white,
+    fontSize: 14,
     fontWeight: '600',
-    color: colors.primary[600],
-    marginRight: 4,
   },
-  section: {
+  heroBookButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: colors.gray[400],
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 6,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroBookButtonText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  heroQuoteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#059669',
+    paddingVertical: 12,
+    borderRadius: 6,
+    gap: 8,
+    marginBottom: 28,
+  },
+  heroQuoteButtonText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  featureBadges: {
+    flexDirection: 'column',
+    backgroundColor: colors.navy[800],
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  featureBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.navy[700],
+    gap: 12,
+  },
+  featureBadgeIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.navy[700],
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  featureBadgeTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.white,
+  },
+  featureBadgeSubtitle: {
+    fontSize: 12,
+    color: colors.gray[400],
+    marginTop: 2,
+  },
+  aboutSection: {
+    backgroundColor: colors.navy[900],
     padding: 24,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  aboutBadge: {
+    backgroundColor: colors.primary[600],
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
     marginBottom: 16,
   },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: colors.gray[900],
-    marginBottom: 16,
-  },
-  viewAllText: {
-    fontSize: 14,
-    color: colors.primary[600],
+  aboutBadgeText: {
+    color: colors.white,
+    fontSize: 12,
     fontWeight: '600',
   },
-  valueGrid: {
+  aboutTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: colors.white,
+    marginBottom: 16,
+  },
+  aboutText: {
+    fontSize: 15,
+    color: colors.gray[300],
+    lineHeight: 24,
+    marginBottom: 12,
+  },
+  learnMoreLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  learnMoreText: {
+    color: colors.primary[400],
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  aboutImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+  },
+  partnersSection: {
+    backgroundColor: colors.white,
+    paddingVertical: 40,
+  },
+  partnersBadge: {
+    backgroundColor: colors.primary[600],
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  partnersBadgeText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  partnersTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: colors.gray[900],
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  partnersSubtitle: {
+    fontSize: 15,
+    color: colors.gray[600],
+    textAlign: 'center',
+    marginBottom: 24,
+    paddingHorizontal: 24,
+  },
+  partnersScroll: {
+    paddingHorizontal: 24,
+    gap: 16,
+  },
+  partnerCard: {
+    width: width * 0.7,
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.primary[100],
+  },
+  partnerImage: {
+    width: '100%',
+    height: 160,
+  },
+  partnerContent: {
+    padding: 16,
+  },
+  partnerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  partnerTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.gray[900],
+  },
+  partnerDescription: {
+    fontSize: 13,
+    color: colors.gray[600],
+    lineHeight: 20,
+  },
+  productsSection: {
+    backgroundColor: colors.white,
+    paddingVertical: 40,
+    paddingHorizontal: 24,
+  },
+  productsBadge: {
+    backgroundColor: colors.primary[600],
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  productsBadgeText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  productsTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: colors.gray[900],
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  productsSubtitle: {
+    fontSize: 15,
+    color: colors.gray[600],
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  productsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: 16,
   },
-  valueCard: {
-    width: (width - 64) / 3,
+  productCard: {
+    width: (width - 64) / 2,
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.primary[100],
+    overflow: 'hidden',
+  },
+  productImageContainer: {
+    height: 140,
+    backgroundColor: colors.gray[50],
     alignItems: 'center',
-    paddingVertical: 16,
+    justifyContent: 'center',
+    padding: 16,
   },
-  valueIcon: {
+  productImage: {
+    width: '100%',
+    height: '100%',
+  },
+  productInfo: {
+    padding: 12,
+  },
+  productName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.gray[900],
+    marginBottom: 4,
+  },
+  productDescription: {
+    fontSize: 12,
+    color: colors.gray[500],
+    marginBottom: 8,
+  },
+  viewDetailsLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  viewDetailsText: {
+    fontSize: 13,
+    color: colors.primary[600],
+    fontWeight: '600',
+  },
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary[600],
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 6,
+    alignSelf: 'center',
+    marginTop: 24,
+    gap: 8,
+  },
+  viewAllButtonText: {
+    color: colors.white,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  footer: {
+    backgroundColor: colors.navy[900],
+    paddingTop: 40,
+  },
+  footerTop: {
+    paddingHorizontal: 24,
+    paddingBottom: 32,
+  },
+  footerBrand: {
+    marginBottom: 24,
+  },
+  footerLogo: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: colors.primary[500],
+    fontStyle: 'italic',
+    marginBottom: 12,
+  },
+  footerBrandText: {
+    fontSize: 14,
+    color: colors.gray[400],
+    lineHeight: 22,
+  },
+  footerLinks: {
+    marginBottom: 24,
+  },
+  footerLinksTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.white,
+    marginBottom: 12,
+  },
+  footerLink: {
+    fontSize: 14,
+    color: colors.gray[400],
+    marginBottom: 8,
+  },
+  footerContact: {
+    marginBottom: 24,
+  },
+  footerContactTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.white,
+    marginBottom: 12,
+  },
+  footerContactItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 8,
+  },
+  footerContactText: {
+    fontSize: 14,
+    color: colors.gray[400],
+    flex: 1,
+  },
+  footerBottom: {
+    borderTopWidth: 1,
+    borderTopColor: colors.navy[700],
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  footerCopyright: {
+    fontSize: 13,
+    color: colors.gray[500],
+  },
+  // How It Works
+  howItWorksSection: {
+    backgroundColor: colors.white,
+    paddingVertical: 48,
+    paddingHorizontal: 24,
+  },
+  howItWorksTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: colors.gray[900],
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  howItWorksSubtitle: {
+    fontSize: 15,
+    color: colors.gray[500],
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  stepsContainer: {
+    gap: 24,
+    marginBottom: 32,
+  },
+  step: {
+    alignItems: 'center',
+  },
+  stepNumberBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primary[600],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  stepNumber: {
+    color: colors.white,
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  stepConnector: {
+    width: 2,
+    height: 20,
+    backgroundColor: colors.primary[200],
+    marginBottom: 12,
+  },
+  stepIconCircle: {
     width: 56,
     height: 56,
     borderRadius: 28,
@@ -221,107 +957,98 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 12,
   },
-  valueTitle: {
-    fontSize: 14,
+  stepTitle: {
+    fontSize: 17,
     fontWeight: '600',
     color: colors.gray[900],
     textAlign: 'center',
-    marginBottom: 4,
-  },
-  valueDescription: {
-    fontSize: 12,
-    color: colors.gray[500],
-    textAlign: 'center',
-  },
-  productsScroll: {
-    paddingRight: 24,
-  },
-  productCard: {
-    width: 200,
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    marginRight: 16,
-    borderWidth: 1,
-    borderColor: colors.gray[200],
-    overflow: 'hidden',
-  },
-  productImage: {
-    width: '100%',
-    height: 140,
-    backgroundColor: colors.gray[50],
-  },
-  productInfo: {
-    padding: 12,
-  },
-  productCategory: {
-    fontSize: 11,
-    color: colors.primary[600],
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  productName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.gray[900],
     marginBottom: 8,
   },
-  productPrice: {
-    fontSize: 13,
-    color: colors.gray[600],
-  },
-  aboutSection: {
-    backgroundColor: colors.gray[50],
-  },
-  aboutText: {
-    fontSize: 15,
-    color: colors.gray[600],
-    lineHeight: 24,
-    marginBottom: 16,
-  },
-  learnMoreButton: {
-    alignSelf: 'flex-start',
-  },
-  learnMoreText: {
+  stepDesc: {
     fontSize: 14,
-    color: colors.primary[600],
+    color: colors.gray[500],
+    textAlign: 'center',
+    lineHeight: 21,
+    maxWidth: 280,
+  },
+  getStartedButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary[600],
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 6,
+    gap: 8,
+    alignSelf: 'center',
+  },
+  getStartedButtonText: {
+    color: colors.white,
+    fontSize: 15,
     fontWeight: '600',
   },
+  // CTA Section
   ctaSection: {
-    backgroundColor: colors.navy[800],
-    padding: 32,
+    backgroundColor: colors.navy[900],
+    paddingVertical: 48,
+    paddingHorizontal: 24,
     alignItems: 'center',
   },
   ctaTitle: {
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: 'bold',
     color: colors.white,
-    marginBottom: 8,
     textAlign: 'center',
+    marginBottom: 12,
   },
   ctaSubtitle: {
     fontSize: 15,
     color: colors.gray[300],
     textAlign: 'center',
-    marginBottom: 20,
+    lineHeight: 22,
+    marginBottom: 28,
+    maxWidth: 320,
   },
-  ctaButton: {
-    backgroundColor: colors.primary[500],
+  ctaButtons: {
+    width: '100%',
+    gap: 12,
+  },
+  ctaBrowseButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
     paddingVertical: 14,
-    paddingHorizontal: 32,
-    borderRadius: 8,
+    borderRadius: 6,
+    gap: 8,
   },
-  ctaButtonText: {
-    fontSize: 16,
+  ctaBrowseButtonText: {
+    color: colors.navy[900],
+    fontSize: 15,
     fontWeight: '600',
-    color: colors.white,
   },
-  footer: {
-    padding: 24,
+  ctaQuoteButton: {
+    backgroundColor: '#059669',
+    paddingVertical: 14,
+    borderRadius: 6,
     alignItems: 'center',
   },
-  footerText: {
-    fontSize: 12,
-    color: colors.gray[400],
+  ctaQuoteButtonText: {
+    color: colors.white,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  ctaBookButton: {
+    borderWidth: 2,
+    borderColor: colors.white,
+    paddingVertical: 14,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  ctaBookButtonText: {
+    color: colors.white,
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
 

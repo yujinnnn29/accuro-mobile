@@ -13,6 +13,7 @@ import { Star, CheckCircle, XCircle, Trash2, User } from 'lucide-react-native';
 import { reviewService } from '../../api';
 import { Review } from '../../types';
 import { colors } from '../../theme';
+import { useTheme } from '../../contexts';
 import { LoadingSpinner, FilterTabs, EmptyState, Card, Badge, Button } from '../../components/common';
 import { StarRating } from '../../components/review';
 
@@ -25,6 +26,7 @@ const filterOptions: { key: FilterKey; label: string }[] = [
 ];
 
 export const AdminReviewsScreen: React.FC = () => {
+  const { theme } = useTheme();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -33,12 +35,7 @@ export const AdminReviewsScreen: React.FC = () => {
 
   const fetchReviews = useCallback(async () => {
     try {
-      const params = selectedFilter === 'pending'
-        ? { isApproved: false }
-        : selectedFilter === 'approved'
-        ? { isApproved: true }
-        : undefined;
-      const response = await reviewService.getAllReviews(params);
+      const response = await reviewService.getAllReviews();
       setReviews(response.data || []);
     } catch (error) {
       console.error('Error fetching reviews:', error);
@@ -46,7 +43,7 @@ export const AdminReviewsScreen: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selectedFilter]);
+  }, []);
 
   useEffect(() => {
     fetchReviews();
@@ -119,6 +116,12 @@ export const AdminReviewsScreen: React.FC = () => {
     );
   };
 
+  const filteredReviews = reviews.filter((r) => {
+    if (selectedFilter === 'pending') return !r.isApproved;
+    if (selectedFilter === 'approved') return r.isApproved;
+    return true;
+  });
+
   const getFilterCounts = () => {
     return filterOptions.map((option) => ({
       ...option,
@@ -146,9 +149,9 @@ export const AdminReviewsScreen: React.FC = () => {
             <User size={18} color={colors.white} />
           </View>
           <View>
-            <Text style={styles.userName}>{item.userName}</Text>
+            <Text style={[styles.userName, { color: theme.text }]}>{item.userName}</Text>
             {item.company && (
-              <Text style={styles.userCompany}>{item.company}</Text>
+              <Text style={[styles.userCompany, { color: theme.textSecondary }]}>{item.company}</Text>
             )}
           </View>
         </View>
@@ -166,9 +169,9 @@ export const AdminReviewsScreen: React.FC = () => {
         <Text style={styles.reviewDate}>{formatDate(item.createdAt)}</Text>
       </View>
 
-      <Text style={styles.reviewComment}>{item.comment}</Text>
+      <Text style={[styles.reviewComment, { color: theme.textSecondary }]}>{item.comment}</Text>
 
-      <View style={styles.reviewActions}>
+      <View style={[styles.reviewActions, { borderTopColor: theme.border }]}>
         {!item.isApproved && (
           <>
             <Button
@@ -215,9 +218,9 @@ export const AdminReviewsScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['bottom']}>
       {/* Filters */}
-      <View style={styles.filterContainer}>
+      <View style={[styles.filterContainer, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
         <FilterTabs
           options={getFilterCounts()}
           selectedKey={selectedFilter}
@@ -227,7 +230,7 @@ export const AdminReviewsScreen: React.FC = () => {
 
       {/* Reviews List */}
       <FlatList
-        data={reviews}
+        data={filteredReviews}
         renderItem={renderReview}
         keyExtractor={(item) => item._id}
         contentContainerStyle={styles.listContent}

@@ -20,7 +20,7 @@ import {
   Send,
   ExternalLink,
 } from 'lucide-react-native';
-import { useAuth } from '../../contexts';
+import { useAuth, useTheme } from '../../contexts';
 import { contactService } from '../../api';
 import { colors } from '../../theme';
 import { Card, Button, Input } from '../../components/common';
@@ -28,6 +28,7 @@ import { Card, Button, Input } from '../../components/common';
 export const ContactScreen: React.FC = () => {
   const navigation = useNavigation();
   const { user, isAuthenticated } = useAuth();
+  const { theme } = useTheme();
 
   const [formData, setFormData] = useState({
     firstName: user?.name?.split(' ')[0] || '',
@@ -121,20 +122,20 @@ export const ContactScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flex}
       >
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             style={styles.backButton}
           >
-            <ArrowLeft size={24} color={colors.gray[900]} />
+            <ArrowLeft size={24} color={theme.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Contact Us</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Contact Us</Text>
           <View style={styles.headerRight} />
         </View>
 
@@ -145,46 +146,46 @@ export const ContactScreen: React.FC = () => {
           {/* Contact Info Cards */}
           <View style={styles.contactCards}>
             <TouchableOpacity
-              style={styles.contactCard}
+              style={[styles.contactCard, { backgroundColor: theme.surface }]}
               onPress={handleCall}
               activeOpacity={0.7}
             >
               <View style={[styles.contactIcon, { backgroundColor: colors.success + '20' }]}>
                 <Phone size={20} color={colors.success} />
               </View>
-              <Text style={styles.contactLabel}>Call Us</Text>
-              <Text style={styles.contactValue}>+63 917 123 4567</Text>
+              <Text style={[styles.contactLabel, { color: theme.textSecondary }]}>Call Us</Text>
+              <Text style={[styles.contactValue, { color: theme.text }]}>+63 917 123 4567</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.contactCard}
+              style={[styles.contactCard, { backgroundColor: theme.surface }]}
               onPress={handleEmail}
               activeOpacity={0.7}
             >
               <View style={[styles.contactIcon, { backgroundColor: colors.primary[100] }]}>
                 <Mail size={20} color={colors.primary[600]} />
               </View>
-              <Text style={styles.contactLabel}>Email Us</Text>
-              <Text style={styles.contactValue}>info@accuro.ph</Text>
+              <Text style={[styles.contactLabel, { color: theme.textSecondary }]}>Email Us</Text>
+              <Text style={[styles.contactValue, { color: theme.text }]}>info@accuro.ph</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.contactCard}
+              style={[styles.contactCard, { backgroundColor: theme.surface }]}
               onPress={handleMap}
               activeOpacity={0.7}
             >
               <View style={[styles.contactIcon, { backgroundColor: colors.warning + '20' }]}>
                 <MapPin size={20} color={colors.warning} />
               </View>
-              <Text style={styles.contactLabel}>Visit Us</Text>
-              <Text style={styles.contactValue}>Makati City</Text>
+              <Text style={[styles.contactLabel, { color: theme.textSecondary }]}>Visit Us</Text>
+              <Text style={[styles.contactValue, { color: theme.text }]}>Makati City</Text>
             </TouchableOpacity>
           </View>
 
           {/* Contact Form */}
           <Card style={styles.formCard} padding="lg">
-            <Text style={styles.formTitle}>Send us a Message</Text>
-            <Text style={styles.formSubtitle}>
+            <Text style={[styles.formTitle, { color: theme.text }]}>Send us a Message</Text>
+            <Text style={[styles.formSubtitle, { color: theme.textSecondary }]}>
               Have a question or inquiry? Fill out the form below and we'll get back to you.
             </Text>
 

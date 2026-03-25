@@ -4,6 +4,7 @@ import { FileText, Package, Calendar, ChevronRight } from 'lucide-react-native';
 import { colors } from '../../theme';
 import { Card } from '../common';
 import QuotationStatusBadge from './QuotationStatusBadge';
+import { useTheme } from '../../contexts';
 
 interface QuotationItem {
   productId: string;
@@ -31,6 +32,7 @@ export const QuotationCard: React.FC<QuotationCardProps> = ({
   quotation,
   onPress,
 }) => {
+  const { theme } = useTheme();
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -61,10 +63,10 @@ export const QuotationCard: React.FC<QuotationCardProps> = ({
             <FileText size={20} color={colors.primary[600]} />
           </View>
           <View>
-            <Text style={styles.quotationNumber}>
+            <Text style={[styles.quotationNumber, { color: theme.text }]}>
               {quotation.quotationNumber}
             </Text>
-            <Text style={styles.date}>
+            <Text style={[styles.date, { color: theme.textSecondary }]}>
               {formatDate(quotation.createdAt)}
             </Text>
           </View>
@@ -79,8 +81,8 @@ export const QuotationCard: React.FC<QuotationCardProps> = ({
 
       <View style={styles.details}>
         <View style={styles.detailRow}>
-          <Package size={16} color={colors.gray[500]} />
-          <Text style={styles.detailText}>
+          <Package size={16} color={colors.gray[400]} />
+          <Text style={[styles.detailText, { color: theme.textSecondary }]}>
             {itemCount} {itemCount === 1 ? 'item' : 'items'}
           </Text>
         </View>
@@ -96,17 +98,17 @@ export const QuotationCard: React.FC<QuotationCardProps> = ({
 
         {quotation.validUntil && quotation.status === 'approved' && (
           <View style={styles.detailRow}>
-            <Calendar size={16} color={colors.gray[500]} />
-            <Text style={styles.detailText}>
+            <Calendar size={16} color={colors.gray[400]} />
+            <Text style={[styles.detailText, { color: theme.textSecondary }]}>
               Valid until {formatDate(quotation.validUntil)}
             </Text>
           </View>
         )}
       </View>
 
-      <View style={styles.itemsPreview}>
+      <View style={[styles.itemsPreview, { borderTopColor: theme.border }]}>
         {quotation.items.slice(0, 2).map((item, index) => (
-          <Text key={index} style={styles.itemText} numberOfLines={1}>
+          <Text key={index} style={[styles.itemText, { color: theme.textSecondary }]} numberOfLines={1}>
             {item.quantity}x {item.productName}
           </Text>
         ))}

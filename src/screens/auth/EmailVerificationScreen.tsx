@@ -26,6 +26,7 @@ export const EmailVerificationScreen: React.FC = () => {
 
   const [status, setStatus] = useState<VerificationStatus>(token ? 'loading' : 'pending');
   const [resending, setResending] = useState(false);
+  const [resendEmail, setResendEmail] = useState('');
 
   useEffect(() => {
     if (token) {
@@ -35,9 +36,9 @@ export const EmailVerificationScreen: React.FC = () => {
 
   const verifyEmail = async () => {
     try {
-      // Assuming there's a verify email endpoint
-      // await authService.verifyEmail(token);
+      await authService.verifyEmail(token!);
       setStatus('success');
+      setTimeout(() => navigation.navigate('Login'), 3000);
     } catch (error) {
       setStatus('error');
     }
@@ -46,17 +47,11 @@ export const EmailVerificationScreen: React.FC = () => {
   const handleResendVerification = async () => {
     setResending(true);
     try {
-      // Assuming there's a resend verification endpoint
-      // await authService.resendVerificationEmail();
-      Alert.alert(
-        'Email Sent',
-        'A new verification email has been sent to your email address.'
-      );
+      await authService.resendVerificationEmail(resendEmail);
+      Alert.alert('Email Sent', 'A new verification email has been sent. Please check your inbox.');
+      setResendEmail('');
     } catch (error: any) {
-      Alert.alert(
-        'Error',
-        error.response?.data?.message || 'Failed to send verification email'
-      );
+      Alert.alert('Error', error.response?.data?.message || 'Failed to send verification email');
     } finally {
       setResending(false);
     }

@@ -7,10 +7,21 @@ import {
   BookingFilters,
 } from '../types';
 
+// Helper to normalize API responses
+function normalizeResponse<T>(data: any, defaultData: T): { success: boolean; data: T } {
+  if (data && typeof data === 'object' && 'success' in data && 'data' in data) {
+    return data;
+  }
+  if (Array.isArray(data)) {
+    return { success: true, data: data as T };
+  }
+  return { success: true, data: data ?? defaultData };
+}
+
 class BookingService {
   async getAll(params?: BookingFilters): Promise<BookingsResponse> {
     const response = await api.get<BookingsResponse>('/bookings', { params });
-    return response.data;
+    return normalizeResponse(response.data, []) as unknown as BookingsResponse;
   }
 
   async getUpcoming(): Promise<BookingsResponse> {
@@ -29,12 +40,14 @@ class BookingService {
   }
 
   async create(data: BookingData): Promise<BookingResponse> {
-    const response = await api.post<BookingResponse>('/bookings', data);
+    const response = await api.post<BookingResponse>('/bookings', data, {
+      timeout: 120000, // 120s - wait for full response including email sending
+    });
     return response.data;
   }
 
-  async update(id: string, data: Partial<Booking>): Promise<BookingResponse> {
-    const response = await api.put<BookingResponse>(`/bookings/${id}`, data);
+  async update(id: string, data: Partial<Booking>, options?: object): Promise<BookingResponse> {
+    const response = await api.put<BookingResponse>(`/bookings/${id}`, data, options);
     return response.data;
   }
 
@@ -46,7 +59,7 @@ class BookingService {
   async cancel(id: string, cancellationReason: string): Promise<BookingResponse> {
     const response = await api.put<BookingResponse>(`/bookings/${id}/cancel`, {
       cancellationReason,
-    });
+    }, { adapter: 'xhr' });
     return response.data;
   }
 
@@ -60,15 +73,15 @@ class BookingService {
       newDate,
       newTime,
       rescheduleReason,
-    });
+    }, { adapter: 'xhr' });
     return response.data;
   }
 
-  async checkAvailability(date: string, time: string): Promise<{ success: boolean; available: boolean }> {
-    const response = await api.get<{ success: boolean; available: boolean }>('/bookings/check-availability', {
+  async checkAvailability(date: string, time: string): Promise<{ isAvailable: boolean; slotsRemaining: number }> {
+    const response = await api.get<{ success: boolean; data: { isAvailable: boolean; slotsRemaining: number } }>('/bookings/check-availability', {
       params: { date, time },
     });
-    return response.data;
+    return response.data.data;
   }
 
   async complete(id: string, conclusion: string): Promise<BookingResponse> {

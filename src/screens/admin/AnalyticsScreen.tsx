@@ -6,6 +6,7 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -13,116 +14,85 @@ import {
   Users,
   FileText,
   Mail,
-  TrendingUp,
-  TrendingDown,
   Clock,
-  CheckCircle,
-  XCircle,
   AlertCircle,
+  RefreshCw,
+  Target,
+  Activity,
+  ArrowRight,
+  BarChart3,
 } from 'lucide-react-native';
-import { analyticsService, activityService, bookingService, quotationService, userService } from '../../api';
+import { analyticsService } from '../../api';
 import { colors } from '../../theme';
-import { LoadingSpinner, Card, Badge } from '../../components/common';
-import { LineChart, BarChart, DonutChart, MetricCard } from '../../components/admin/ChartComponents';
-import {
-  AnalyticsSummary,
-  BookingTrendData,
-  QuoteAnalytics,
-  ConversionFunnelData,
-} from '../../types';
+import { LoadingSpinner, Card } from '../../components/common';
+import { LineChart, BarChart, DonutChart } from '../../components/admin/ChartComponents';
+import { BookingTrendData, ActivityItem } from '../../types';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type PeriodFilter = 7 | 14 | 30;
+
+// Helper functions matching website
+const formatDate = (dateStr: string) => {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+
+const getTimeAgo = (dateStr: string) => {
+  const now = new Date();
+  const date = new Date(dateStr);
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d ago`;
+};
+
+const getStatusColor = (status: string) => {
+  const statusColors: Record<string, { bg: string; text: string }> = {
+    confirmed: { bg: '#dcfce7', text: '#166534' },
+    completed: { bg: '#dcfce7', text: '#166534' },
+    pending: { bg: '#fef9c3', text: '#854d0e' },
+    cancelled: { bg: '#fee2e2', text: '#991b1b' },
+    rejected: { bg: '#fee2e2', text: '#991b1b' },
+    sent: { bg: '#dbeafe', text: '#1e40af' },
+    accepted: { bg: '#dcfce7', text: '#166534' },
+  };
+  return statusColors[status?.toLowerCase()] || { bg: '#f3f4f6', text: '#374151' };
+};
 
 export const AnalyticsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [period, setPeriod] = useState<PeriodFilter>(30);
 
-  // Analytics data
-  const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
+  // Data states matching website
+  const [dashboardData, setDashboardData] = useState<any>(null);
   const [bookingTrends, setBookingTrends] = useState<BookingTrendData[]>([]);
-  const [quoteAnalytics, setQuoteAnalytics] = useState<QuoteAnalytics | null>(null);
-  const [funnelData, setFunnelData] = useState<ConversionFunnelData[]>([]);
+  const [pendingActions, setPendingActions] = useState<any>(null);
+  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
+  const [conversionFunnel, setConversionFunnel] = useState<any>(null);
+  const [quoteData, setQuoteData] = useState<any>(null);
 
   const fetchAnalytics = useCallback(async () => {
     try {
-      // Try new analytics endpoints first, fallback to existing data
-      const [
-        summaryRes,
-        trendsRes,
-        quoteRes,
-        funnelRes,
-      ] = await Promise.all([
-        analyticsService.getAnalyticsSummary().catch(() => null),
-        analyticsService.getBookingTrends(period).catch(() => null),
-        analyticsService.getQuoteAnalytics().catch(() => null),
-        analyticsService.getConversionFunnel().catch(() => null),
+      const [dashboard, trends, pending, activity, funnel, quotes] = await Promise.all([
+        analyticsService.getDashboardStats().catch(() => ({ data: null })),
+        analyticsService.getBookingTrends(period).catch(() => ({ data: [] })),
+        analyticsService.getPendingActions().catch(() => ({ data: null })),
+        analyticsService.getRecentActivity(10).catch(() => ({ data: [] })),
+        analyticsService.getConversionFunnel().catch(() => ({ data: null })),
+        analyticsService.getQuoteAnalytics().catch(() => ({ data: null })),
       ]);
 
-      if (summaryRes?.data) {
-        setSummary(summaryRes.data);
-      } else {
-        // Fallback: build summary from existing services
-        const [adminStats, usersData] = await Promise.all([
-          activityService.getAdminStats().catch(() => ({ data: null })),
-          userService.getUsers().catch(() => ({ data: [] })),
-        ]);
-
-        setSummary({
-          totalBookings: adminStats.data?.totalBookings || 0,
-          totalUsers: usersData.data?.length || adminStats.data?.totalUsers || 0,
-          totalQuotes: adminStats.data?.totalQuotations || 0,
-          totalContacts: 0,
-          bookingGrowth: 12, // Placeholder
-          userGrowth: 8,
-          quoteGrowth: 15,
-          contactGrowth: 5,
-        });
-      }
-
-      if (trendsRes?.data) {
-        setBookingTrends(trendsRes.data);
-      } else {
-        // Fallback: generate mock trend data
-        const now = new Date();
-        const mockTrends: BookingTrendData[] = [];
-        for (let i = period - 1; i >= 0; i--) {
-          const date = new Date(now);
-          date.setDate(date.getDate() - i);
-          mockTrends.push({
-            date: date.toISOString().split('T')[0],
-            count: Math.floor(Math.random() * 10) + 1,
-          });
-        }
-        setBookingTrends(mockTrends);
-      }
-
-      if (quoteRes?.data) {
-        setQuoteAnalytics(quoteRes.data);
-      } else {
-        // Fallback from admin stats
-        const adminStats = await activityService.getAdminStats().catch(() => ({ data: null }));
-        setQuoteAnalytics({
-          totalQuotes: adminStats.data?.totalQuotations || 0,
-          pendingQuotes: adminStats.data?.pendingQuotations || 0,
-          approvedQuotes: Math.floor((adminStats.data?.totalQuotations || 0) * 0.6),
-          rejectedQuotes: Math.floor((adminStats.data?.totalQuotations || 0) * 0.2),
-          approvalRate: 60,
-          avgResponseTime: 24,
-        });
-      }
-
-      if (funnelRes?.data && Array.isArray(funnelRes.data)) {
-        setFunnelData(funnelRes.data);
-      } else {
-        // Mock funnel data
-        setFunnelData([
-          { stage: 'Visitors', count: 1000, percentage: 100 },
-          { stage: 'Quotes', count: 250, percentage: 25 },
-          { stage: 'Bookings', count: 100, percentage: 10 },
-          { stage: 'Completed', count: 80, percentage: 8 },
-        ]);
-      }
+      setDashboardData(dashboard.data || null);
+      setBookingTrends(trends.data || []);
+      setPendingActions(pending.data || null);
+      setRecentActivity(Array.isArray(activity.data) ? activity.data : []);
+      setConversionFunnel(funnel.data || null);
+      setQuoteData(quotes.data || null);
     } catch (error) {
       console.error('Error fetching analytics:', error);
     } finally {
@@ -141,23 +111,45 @@ export const AnalyticsScreen: React.FC = () => {
   };
 
   const formatTrendLabels = (data: BookingTrendData[]) => {
-    if (period === 7) {
-      return data.map((d) => {
-        const date = new Date(d.date);
-        return date.toLocaleDateString('en-US', { weekday: 'short' });
-      });
+    if (data.length <= 7) {
+      return data.map((d) => formatDate(d.date));
     }
     return data
       .filter((_, i) => i % Math.ceil(data.length / 7) === 0 || i === data.length - 1)
-      .map((d) => {
-        const date = new Date(d.date);
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      });
+      .map((d) => formatDate(d.date));
+  };
+
+  const getTrendChartData = (data: BookingTrendData[]) => {
+    if (data.length <= 7) return data.map((t) => t.count);
+    return data
+      .filter((_, i) => i % Math.ceil(data.length / 7) === 0 || i === data.length - 1)
+      .map((t) => t.count);
   };
 
   if (loading) {
     return <LoadingSpinner fullScreen text="Loading analytics..." />;
   }
+
+  const totalBookings = dashboardData?.totalBookings ?? 0;
+  const totalUsers = dashboardData?.totalUsers ?? 0;
+  const totalQuotes = dashboardData?.totalQuotes ?? 0;
+  const totalContacts = dashboardData?.totalContacts ?? 0;
+  const topServices = dashboardData?.products || [];
+
+  // Build quote status data for donut chart
+  const quoteStatusData = quoteData?.byStatus || [];
+  const quoteTotal = quoteData?.total || 0;
+
+  // Pending actions data
+  const unconfirmedBookings = pendingActions?.unconfirmedBookings ?? 0;
+  const pendingQuotes = pendingActions?.pendingQuotes ?? 0;
+  const unreadContacts = pendingActions?.unreadContacts ?? 0;
+  const todayBookings = pendingActions?.todayBookings ?? 0;
+
+  // Conversion funnel
+  const funnelStages = conversionFunnel?.funnel || [];
+  const funnelQuotes = conversionFunnel?.quotes || {};
+  const funnelBookings = conversionFunnel?.bookings || {};
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -167,193 +159,352 @@ export const AnalyticsScreen: React.FC = () => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* Summary Metrics */}
+        {/* Header */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.headerTitle}>Analytics Overview</Text>
+            <Text style={styles.headerSubtitle}>Business insights at a glance</Text>
+          </View>
+          <TouchableOpacity style={styles.refreshButton} onPress={onRefresh}>
+            <RefreshCw size={16} color={colors.gray[600]} />
+            <Text style={styles.refreshText}>Refresh</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Summary Cards - Gradient style matching website */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Overview</Text>
-          <View style={styles.metricsGrid}>
-            <MetricCard
-              title="Total Bookings"
-              value={summary?.totalBookings || 0}
-              change={summary?.bookingGrowth}
-              icon={<Calendar size={20} color={colors.primary[600]} />}
-              color={colors.primary[600]}
-            />
-            <MetricCard
-              title="Total Users"
-              value={summary?.totalUsers || 0}
-              change={summary?.userGrowth}
-              icon={<Users size={20} color={colors.success} />}
-              color={colors.success}
-            />
-            <MetricCard
-              title="Quotations"
-              value={summary?.totalQuotes || 0}
-              change={summary?.quoteGrowth}
-              icon={<FileText size={20} color={colors.info} />}
-              color={colors.info}
-            />
-            <MetricCard
-              title="Contacts"
-              value={summary?.totalContacts || 0}
-              change={summary?.contactGrowth}
-              icon={<Mail size={20} color={colors.warning} />}
-              color={colors.warning}
-            />
+          <View style={styles.summaryGrid}>
+            <View style={[styles.summaryCard, styles.summaryBlue]}>
+              <View style={styles.summaryCardContent}>
+                <View>
+                  <Text style={styles.summaryCardLabel}>Total Bookings</Text>
+                  <Text style={styles.summaryCardValue}>{totalBookings}</Text>
+                </View>
+                <Calendar size={32} color="rgba(255,255,255,0.5)" />
+              </View>
+            </View>
+
+            <View style={[styles.summaryCard, styles.summaryGreen]}>
+              <View style={styles.summaryCardContent}>
+                <View>
+                  <Text style={styles.summaryCardLabel}>Total Users</Text>
+                  <Text style={styles.summaryCardValue}>{totalUsers}</Text>
+                </View>
+                <Users size={32} color="rgba(255,255,255,0.5)" />
+              </View>
+            </View>
+
+            <View style={[styles.summaryCard, styles.summaryPurple]}>
+              <View style={styles.summaryCardContent}>
+                <View>
+                  <Text style={styles.summaryCardLabel}>Quote Requests</Text>
+                  <Text style={styles.summaryCardValue}>{totalQuotes}</Text>
+                </View>
+                <FileText size={32} color="rgba(255,255,255,0.5)" />
+              </View>
+            </View>
+
+            <View style={[styles.summaryCard, styles.summaryOrange]}>
+              <View style={styles.summaryCardContent}>
+                <View>
+                  <Text style={styles.summaryCardLabel}>Contact Forms</Text>
+                  <Text style={styles.summaryCardValue}>{totalContacts}</Text>
+                </View>
+                <Mail size={32} color="rgba(255,255,255,0.5)" />
+              </View>
+            </View>
           </View>
         </View>
 
         {/* Booking Trends */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Booking Trends</Text>
-            <View style={styles.periodFilters}>
-              {[7, 14, 30].map((p) => (
-                <TouchableOpacity
-                  key={p}
-                  style={[
-                    styles.periodButton,
-                    period === p && styles.periodButtonActive,
-                  ]}
-                  onPress={() => setPeriod(p as PeriodFilter)}
-                >
-                  <Text
-                    style={[
-                      styles.periodButtonText,
-                      period === p && styles.periodButtonTextActive,
-                    ]}
-                  >
-                    {p}D
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
           <Card style={styles.chartCard} padding="md">
-            <LineChart
-              data={{
-                labels: formatTrendLabels(bookingTrends),
-                data: period === 7
-                  ? bookingTrends.map((t) => t.count)
-                  : bookingTrends
-                      .filter((_, i) => i % Math.ceil(bookingTrends.length / 7) === 0 || i === bookingTrends.length - 1)
-                      .map((t) => t.count),
-              }}
-              height={220}
-              color={colors.primary[600]}
-            />
-          </Card>
-        </View>
-
-        {/* Quote Analytics */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quote Analytics</Text>
-          <Card style={styles.chartCard} padding="md">
-            <View style={styles.quoteStatsRow}>
-              <View style={styles.quoteStat}>
-                <View style={[styles.quoteIcon, { backgroundColor: colors.success + '20' }]}>
-                  <CheckCircle size={20} color={colors.success} />
-                </View>
-                <Text style={styles.quoteStatValue}>{quoteAnalytics?.approvedQuotes || 0}</Text>
-                <Text style={styles.quoteStatLabel}>Approved</Text>
-              </View>
-              <View style={styles.quoteStat}>
-                <View style={[styles.quoteIcon, { backgroundColor: colors.warning + '20' }]}>
-                  <Clock size={20} color={colors.warning} />
-                </View>
-                <Text style={styles.quoteStatValue}>{quoteAnalytics?.pendingQuotes || 0}</Text>
-                <Text style={styles.quoteStatLabel}>Pending</Text>
-              </View>
-              <View style={styles.quoteStat}>
-                <View style={[styles.quoteIcon, { backgroundColor: colors.error + '20' }]}>
-                  <XCircle size={20} color={colors.error} />
-                </View>
-                <Text style={styles.quoteStatValue}>{quoteAnalytics?.rejectedQuotes || 0}</Text>
-                <Text style={styles.quoteStatLabel}>Rejected</Text>
-              </View>
-            </View>
-
-            <View style={styles.approvalRateContainer}>
-              <View style={styles.approvalRateInfo}>
-                <Text style={styles.approvalRateLabel}>Approval Rate</Text>
-                <Text style={styles.approvalRateValue}>
-                  {quoteAnalytics?.approvalRate || 0}%
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.cardTitle}>Booking Trends</Text>
+                <Text style={styles.cardSubtitle}>
+                  Bookings over the last {period} days
                 </Text>
               </View>
-              <View style={styles.approvalRateBar}>
-                <View
-                  style={[
-                    styles.approvalRateFill,
-                    { width: `${quoteAnalytics?.approvalRate || 0}%` },
-                  ]}
+              <View style={styles.periodFilters}>
+                {([7, 14, 30] as PeriodFilter[]).map((p) => (
+                  <TouchableOpacity
+                    key={p}
+                    style={[
+                      styles.periodButton,
+                      period === p && styles.periodButtonActive,
+                    ]}
+                    onPress={() => setPeriod(p)}
+                  >
+                    <Text
+                      style={[
+                        styles.periodButtonText,
+                        period === p && styles.periodButtonTextActive,
+                      ]}
+                    >
+                      {p}D
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            {bookingTrends.length > 0 ? (
+              <LineChart
+                data={{
+                  labels: formatTrendLabels(bookingTrends),
+                  data: getTrendChartData(bookingTrends),
+                }}
+                height={220}
+                color={colors.primary[600]}
+              />
+            ) : (
+              <View style={styles.emptyChart}>
+                <Text style={styles.emptyChartText}>No booking data for this period</Text>
+              </View>
+            )}
+          </Card>
+        </View>
+
+        {/* Pending Actions - List style matching website */}
+        <View style={styles.section}>
+          <Card style={styles.chartCard} padding="md">
+            <View style={styles.cardTitleRow}>
+              <AlertCircle size={18} color="#ca8a04" />
+              <Text style={styles.cardTitle}>Pending Actions</Text>
+            </View>
+
+            <View style={styles.pendingList}>
+              <View style={styles.pendingItem}>
+                <View style={styles.pendingItemLeft}>
+                  <View style={[styles.pendingIcon, { backgroundColor: '#fef3c7' }]}>
+                    <Clock size={16} color="#ca8a04" />
+                  </View>
+                  <Text style={styles.pendingLabel}>Unconfirmed Bookings</Text>
+                </View>
+                <Text style={[styles.pendingValue, unconfirmedBookings > 0 && { color: '#ca8a04' }]}>
+                  {unconfirmedBookings}
+                </Text>
+              </View>
+
+              <View style={styles.pendingItem}>
+                <View style={styles.pendingItemLeft}>
+                  <View style={[styles.pendingIcon, { backgroundColor: '#f3e8ff' }]}>
+                    <FileText size={16} color="#7c3aed" />
+                  </View>
+                  <Text style={styles.pendingLabel}>Pending Quotes</Text>
+                </View>
+                <Text style={[styles.pendingValue, pendingQuotes > 0 && { color: '#7c3aed' }]}>
+                  {pendingQuotes}
+                </Text>
+              </View>
+
+              <View style={styles.pendingItem}>
+                <View style={styles.pendingItemLeft}>
+                  <View style={[styles.pendingIcon, { backgroundColor: '#ffedd5' }]}>
+                    <Mail size={16} color="#ea580c" />
+                  </View>
+                  <Text style={styles.pendingLabel}>Unread Contacts</Text>
+                </View>
+                <Text style={[styles.pendingValue, unreadContacts > 0 && { color: '#ea580c' }]}>
+                  {unreadContacts}
+                </Text>
+              </View>
+
+              <View style={[styles.pendingItem, styles.pendingItemHighlight]}>
+                <View style={styles.pendingItemLeft}>
+                  <View style={[styles.pendingIcon, { backgroundColor: '#dbeafe' }]}>
+                    <Calendar size={16} color="#2563eb" />
+                  </View>
+                  <Text style={[styles.pendingLabel, { fontWeight: '600', color: '#1e40af' }]}>
+                    Today's Bookings
+                  </Text>
+                </View>
+                <Text style={[styles.pendingValue, { color: '#2563eb' }]}>
+                  {todayBookings}
+                </Text>
+              </View>
+            </View>
+          </Card>
+        </View>
+
+        {/* Top Services */}
+        {topServices.length > 0 && (
+          <View style={styles.section}>
+            <Card style={styles.chartCard} padding="md">
+              <View>
+                <Text style={styles.cardTitle}>Top Services</Text>
+                <Text style={styles.cardSubtitle}>Most requested calibration services</Text>
+              </View>
+              <View style={{ marginTop: 12 }}>
+                {topServices.slice(0, 5).map((service: any, index: number) => {
+                  const maxCount = Math.max(...topServices.slice(0, 5).map((s: any) => s.count || 0), 1);
+                  const barColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+                  const barColor = barColors[index % barColors.length];
+                  const barWidth = ((service.count || 0) / maxCount) * 100;
+                  return (
+                    <View key={service._id || index} style={styles.topServiceRow}>
+                      <Text style={styles.topServiceName} numberOfLines={1}>
+                        {service._id || 'Unknown'}
+                      </Text>
+                      <View style={styles.topServiceBarBg}>
+                        <View
+                          style={[
+                            styles.topServiceBar,
+                            { width: `${barWidth}%`, backgroundColor: barColor },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.topServiceCount}>{service.count || 0}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </Card>
+          </View>
+        )}
+
+        {/* Quote Status */}
+        {quoteStatusData.length > 0 && (
+          <View style={styles.section}>
+            <Card style={styles.chartCard} padding="md">
+              <View>
+                <Text style={styles.cardTitle}>Quote Status</Text>
+                <Text style={styles.cardSubtitle}>Breakdown by status ({quoteTotal} total)</Text>
+              </View>
+              <View style={{ marginTop: 16 }}>
+                <DonutChart
+                  data={quoteStatusData.map((item: any) => {
+                    const statusColors: Record<string, string> = {
+                      pending: '#fbbf24',
+                      sent: '#3b82f6',
+                      accepted: '#10b981',
+                      rejected: '#ef4444',
+                    };
+                    return {
+                      value: item.count || 0,
+                      color: statusColors[item._id] || '#6b7280',
+                      label: (item._id || 'unknown').charAt(0).toUpperCase() + (item._id || 'unknown').slice(1),
+                    };
+                  })}
+                  size={150}
+                  strokeWidth={22}
+                  centerValue={quoteTotal}
+                  centerLabel="Total"
                 />
               </View>
-            </View>
+            </Card>
+          </View>
+        )}
 
-            <View style={styles.avgResponseTime}>
-              <AlertCircle size={16} color={colors.gray[400]} />
-              <Text style={styles.avgResponseText}>
-                Avg. response time: {quoteAnalytics?.avgResponseTime || 0} hours
-              </Text>
-            </View>
-          </Card>
-        </View>
-
-        {/* Conversion Funnel */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Conversion Funnel</Text>
-          <Card style={styles.chartCard} padding="md">
-            {(funnelData || []).map((stage, index) => (
-              <View key={stage.stage} style={styles.funnelStage}>
-                <View style={styles.funnelInfo}>
-                  <Text style={styles.funnelStageName}>{stage.stage}</Text>
-                  <Text style={styles.funnelStageCount}>{stage.count.toLocaleString()}</Text>
-                </View>
-                <View style={styles.funnelBarContainer}>
-                  <View
-                    style={[
-                      styles.funnelBar,
-                      {
-                        width: `${stage.percentage}%`,
-                        backgroundColor: [colors.primary[300], colors.primary[400], colors.primary[500], colors.primary[600]][index] || colors.primary[600],
-                      },
-                    ]}
-                  />
-                </View>
-                <Text style={styles.funnelPercentage}>{stage.percentage}%</Text>
+        {/* Conversion Funnel - Grid style matching website */}
+        {funnelStages.length > 0 && (
+          <View style={styles.section}>
+            <Card style={styles.chartCard} padding="md">
+              <View style={styles.cardTitleRow}>
+                <Target size={18} color={colors.primary[600]} />
+                <Text style={styles.cardTitle}>Conversion Funnel</Text>
               </View>
-            ))}
-          </Card>
-        </View>
 
-        {/* Pending Actions Breakdown */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Pending Actions</Text>
-          <Card style={styles.chartCard} padding="md">
-            <DonutChart
-              data={[
-                {
-                  value: quoteAnalytics?.pendingQuotes || 0,
-                  color: colors.info,
-                  label: 'Pending Quotes',
-                },
-                {
-                  value: 3, // Placeholder for pending reviews
-                  color: colors.warning,
-                  label: 'Pending Reviews',
-                },
-                {
-                  value: 2, // Placeholder for pending bookings
-                  color: colors.primary[600],
-                  label: 'Pending Bookings',
-                },
-              ]}
-              size={160}
-              strokeWidth={24}
-              centerValue={(quoteAnalytics?.pendingQuotes || 0) + 5}
-              centerLabel="Total Pending"
-            />
-          </Card>
-        </View>
+              <View style={styles.funnelGrid}>
+                {funnelStages.map((stage: any, index: number) => (
+                  <View key={index} style={styles.funnelGridItem}>
+                    <View style={styles.funnelGridCard}>
+                      <Text style={styles.funnelGridValue}>{stage.count}</Text>
+                      <Text style={styles.funnelGridLabel}>{stage.stage}</Text>
+                    </View>
+                    {index < funnelStages.length - 1 && (
+                      <ArrowRight size={14} color={colors.gray[400]} style={{ marginHorizontal: 2 }} />
+                    )}
+                  </View>
+                ))}
+              </View>
+
+              {/* Conversion Rates */}
+              <View style={styles.conversionRatesRow}>
+                <View style={styles.conversionRate}>
+                  <Text style={styles.conversionRateLabel}>Quote Acceptance</Text>
+                  <Text style={[
+                    styles.conversionRateValue,
+                    (funnelQuotes.rate || 0) > 50 && { color: colors.success },
+                  ]}>
+                    {funnelQuotes.rate || 0}%
+                  </Text>
+                </View>
+                <View style={styles.conversionRate}>
+                  <Text style={styles.conversionRateLabel}>Booking Confirmation</Text>
+                  <Text style={[
+                    styles.conversionRateValue,
+                    (funnelBookings.confirmationRate || 0) > 50 && { color: colors.success },
+                  ]}>
+                    {funnelBookings.confirmationRate || 0}%
+                  </Text>
+                </View>
+                <View style={styles.conversionRate}>
+                  <Text style={styles.conversionRateLabel}>Completion</Text>
+                  <Text style={[
+                    styles.conversionRateValue,
+                    (funnelBookings.completionRate || 0) > 50 && { color: colors.success },
+                  ]}>
+                    {funnelBookings.completionRate || 0}%
+                  </Text>
+                </View>
+              </View>
+            </Card>
+          </View>
+        )}
+
+        {/* Recent Activity - Matching website */}
+        {recentActivity.length > 0 && (
+          <View style={styles.section}>
+            <Card style={styles.chartCard} padding="md">
+              <View style={styles.cardTitleRow}>
+                <Activity size={18} color={colors.primary[600]} />
+                <Text style={styles.cardTitle}>Recent Activity</Text>
+              </View>
+
+              <View style={styles.activityList}>
+                {recentActivity.map((item, index) => {
+                  const statusColor = getStatusColor(
+                    (item as any).status || (item as any).action || ''
+                  );
+                  return (
+                    <View key={item._id || index} style={styles.activityItem}>
+                      <View style={styles.activityItemLeft}>
+                        <View style={[styles.activityDot, {
+                          backgroundColor: item.resourceType === 'booking' ? '#3b82f6'
+                            : item.resourceType === 'quotation' ? '#8b5cf6'
+                            : item.resourceType === 'contact' ? '#f59e0b'
+                            : item.resourceType === 'user' ? '#10b981'
+                            : '#6b7280',
+                        }]} />
+                        <View style={styles.activityInfo}>
+                          <Text style={styles.activityTitle} numberOfLines={1}>
+                            {(item as any).title || item.description || `${item.action} ${item.resourceType}`}
+                          </Text>
+                          <Text style={styles.activitySubtitle} numberOfLines={1}>
+                            {(item as any).subtitle ||
+                              (typeof item.user === 'object' ? item.user?.name : '') ||
+                              item.resource}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.activityItemRight}>
+                        <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
+                          <Text style={[styles.statusBadgeText, { color: statusColor.text }]}>
+                            {(item as any).status || item.action || ''}
+                          </Text>
+                        </View>
+                        <Text style={styles.activityTime}>
+                          {getTimeAgo(item.timestamp || (item as any).date || '')}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </Card>
+          </View>
+        )}
 
         <View style={styles.bottomPadding} />
       </ScrollView>
@@ -366,35 +517,111 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.gray[50],
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 4,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: colors.gray[900],
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: colors.gray[500],
+    marginTop: 2,
+  },
+  refreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.gray[100],
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
+  refreshText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.gray[600],
+  },
   section: {
     paddingHorizontal: 16,
-    marginTop: 20,
+    marginTop: 16,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 12,
   },
-  sectionTitle: {
-    fontSize: 18,
+  cardTitle: {
+    fontSize: 17,
     fontWeight: '600',
     color: colors.gray[900],
-    marginBottom: 12,
   },
-  metricsGrid: {
+  cardSubtitle: {
+    fontSize: 12,
+    color: colors.gray[500],
+    marginTop: 2,
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+
+  // Summary cards - gradient style
+  summaryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
   },
+  summaryCard: {
+    width: (SCREEN_WIDTH - 44) / 2,
+    borderRadius: 14,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  summaryBlue: { backgroundColor: '#3b82f6' },
+  summaryGreen: { backgroundColor: '#22c55e' },
+  summaryPurple: { backgroundColor: '#8b5cf6' },
+  summaryOrange: { backgroundColor: '#f97316' },
+  summaryCardContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  summaryCardLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '500',
+  },
+  summaryCardValue: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginTop: 4,
+  },
+
+  // Period filters
   periodFilters: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
   },
   periodButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
     backgroundColor: colors.gray[100],
   },
   periodButtonActive: {
@@ -406,114 +633,206 @@ const styles = StyleSheet.create({
     color: colors.gray[600],
   },
   periodButtonTextActive: {
-    color: colors.white,
+    color: '#ffffff',
   },
+
   chartCard: {
     marginTop: 0,
   },
-  quoteStatsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 20,
-  },
-  quoteStat: {
-    alignItems: 'center',
-  },
-  quoteIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
+
+  emptyChart: {
+    height: 220,
     justifyContent: 'center',
-    marginBottom: 8,
+    alignItems: 'center',
   },
-  quoteStatValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.gray[900],
+  emptyChartText: {
+    fontSize: 14,
+    color: colors.gray[400],
   },
-  quoteStatLabel: {
-    fontSize: 12,
-    color: colors.gray[500],
-    marginTop: 2,
+
+  // Pending Actions - List style
+  pendingList: {
+    gap: 10,
   },
-  approvalRateContainer: {
-    marginBottom: 16,
-  },
-  approvalRateInfo: {
+  pendingItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    padding: 12,
+    backgroundColor: colors.gray[50],
+    borderRadius: 10,
   },
-  approvalRateLabel: {
-    fontSize: 14,
-    color: colors.gray[600],
+  pendingItemHighlight: {
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
   },
-  approvalRateValue: {
+  pendingItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  pendingIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pendingLabel: {
+    fontSize: 13,
+    color: colors.gray[700],
+  },
+  pendingValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: colors.success,
+    color: colors.gray[500],
   },
-  approvalRateBar: {
-    height: 8,
-    backgroundColor: colors.gray[200],
+
+  // Top Services
+  topServiceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  topServiceName: {
+    width: 100,
+    fontSize: 12,
+    color: colors.gray[600],
+  },
+  topServiceBarBg: {
+    flex: 1,
+    height: 20,
+    backgroundColor: colors.gray[100],
     borderRadius: 4,
+    marginHorizontal: 8,
     overflow: 'hidden',
   },
-  approvalRateFill: {
+  topServiceBar: {
     height: '100%',
-    backgroundColor: colors.success,
     borderRadius: 4,
   },
-  avgResponseTime: {
+  topServiceCount: {
+    width: 30,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.gray[700],
+    textAlign: 'right',
+  },
+
+  // Conversion Funnel - Grid style
+  funnelGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 16,
+  },
+  funnelGridItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  funnelGridCard: {
+    backgroundColor: colors.gray[50],
+    borderRadius: 10,
+    padding: 12,
+    alignItems: 'center',
+    minWidth: 70,
+  },
+  funnelGridValue: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: colors.gray[900],
+  },
+  funnelGridLabel: {
+    fontSize: 10,
+    color: colors.gray[500],
+    marginTop: 2,
+  },
+  conversionRatesRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: colors.gray[200],
+    paddingTop: 14,
+    gap: 8,
+  },
+  conversionRate: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  conversionRateLabel: {
+    fontSize: 11,
+    color: colors.gray[500],
+    textAlign: 'center',
+  },
+  conversionRateValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.gray[800],
+    marginTop: 4,
+  },
+
+  // Recent Activity
+  activityList: {
+    gap: 8,
+  },
+  activityItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 10,
+    backgroundColor: colors.gray[50],
+    borderRadius: 10,
+  },
+  activityItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    minWidth: 0,
+  },
+  activityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  activityInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  activityTitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.gray[800],
+  },
+  activitySubtitle: {
+    fontSize: 11,
+    color: colors.gray[500],
+    marginTop: 1,
+  },
+  activityItemRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.gray[100],
+    flexShrink: 0,
+    marginLeft: 8,
   },
-  avgResponseText: {
-    fontSize: 13,
-    color: colors.gray[500],
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
   },
-  funnelStage: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  funnelInfo: {
-    width: 100,
-  },
-  funnelStageName: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: colors.gray[700],
-  },
-  funnelStageCount: {
-    fontSize: 11,
-    color: colors.gray[500],
-  },
-  funnelBarContainer: {
-    flex: 1,
-    height: 24,
-    backgroundColor: colors.gray[100],
-    borderRadius: 4,
-    marginHorizontal: 12,
-    overflow: 'hidden',
-  },
-  funnelBar: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  funnelPercentage: {
-    width: 40,
-    fontSize: 12,
+  statusBadgeText: {
+    fontSize: 10,
     fontWeight: '600',
-    color: colors.gray[600],
-    textAlign: 'right',
+    textTransform: 'capitalize',
   },
+  activityTime: {
+    fontSize: 10,
+    color: colors.gray[400],
+  },
+
   bottomPadding: {
     height: 24,
   },

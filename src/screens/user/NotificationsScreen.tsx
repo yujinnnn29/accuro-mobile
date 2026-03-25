@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CheckCheck, Trash2 } from 'lucide-react-native';
 import { notificationService } from '../../api';
-import { useSocket } from '../../contexts';
+import { useSocket, useNotifications, useTheme } from '../../contexts';
 import { colors } from '../../theme';
 import { LoadingSpinner, FilterTabs, EmptyState } from '../../components/common';
 import { NotificationCard, Notification } from '../../components/notification';
@@ -26,6 +26,8 @@ const filterOptions: { key: FilterKey; label: string }[] = [
 
 export const NotificationsScreen: React.FC = () => {
   const { onNotification } = useSocket();
+  const { refreshUnreadCount } = useNotifications();
+  const { isDark, theme } = useTheme();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -35,13 +37,14 @@ export const NotificationsScreen: React.FC = () => {
     try {
       const response = await notificationService.getNotifications();
       setNotifications(response.data || []);
+      refreshUnreadCount();
     } catch (error) {
       console.error('Error fetching notifications:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [refreshUnreadCount]);
 
   useEffect(() => {
     fetchNotifications();
@@ -67,6 +70,7 @@ export const NotificationsScreen: React.FC = () => {
       setNotifications((prev) =>
         prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
       );
+      refreshUnreadCount();
     } catch (error) {
       console.error('Error marking as read:', error);
     }
@@ -78,6 +82,7 @@ export const NotificationsScreen: React.FC = () => {
       setNotifications((prev) =>
         prev.map((n) => ({ ...n, isRead: true }))
       );
+      refreshUnreadCount();
     } catch (error) {
       Alert.alert('Error', 'Failed to mark all as read');
     }
@@ -173,11 +178,11 @@ export const NotificationsScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
         <View>
-          <Text style={styles.headerTitle}>Notifications</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Notifications</Text>
           {unreadCount > 0 && (
             <Text style={styles.headerSubtitle}>
               {unreadCount} unread
@@ -188,14 +193,14 @@ export const NotificationsScreen: React.FC = () => {
           <View style={styles.headerActions}>
             {unreadCount > 0 && (
               <TouchableOpacity
-                style={styles.headerButton}
+                style={[styles.headerButton, { backgroundColor: isDark ? theme.primaryLight : colors.gray[100] }]}
                 onPress={handleMarkAllAsRead}
               >
                 <CheckCheck size={20} color={colors.primary[600]} />
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              style={styles.headerButton}
+              style={[styles.headerButton, { backgroundColor: isDark ? theme.primaryLight : colors.gray[100] }]}
               onPress={handleClearAll}
             >
               <Trash2 size={20} color={colors.error} />
@@ -206,7 +211,7 @@ export const NotificationsScreen: React.FC = () => {
 
       {/* Filters */}
       {notifications.length > 0 && (
-        <View style={styles.filterContainer}>
+        <View style={[styles.filterContainer, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
           <FilterTabs
             options={getFilterCounts()}
             selectedKey={selectedFilter}

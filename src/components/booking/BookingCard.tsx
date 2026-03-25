@@ -5,6 +5,7 @@ import { Booking } from '../../types';
 import { colors } from '../../theme';
 import { Card } from '../common';
 import BookingStatusBadge from './BookingStatusBadge';
+import { useTheme } from '../../contexts';
 
 interface BookingCardProps {
   booking: Booking;
@@ -15,6 +16,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
   booking,
   onPress,
 }) => {
+  const { theme } = useTheme();
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -41,7 +43,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
     >
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.purpose}>{booking.purpose}</Text>
+          <Text style={[styles.purpose, { color: theme.text }]}>{booking.purpose}</Text>
           <BookingStatusBadge status={booking.status} size="sm" />
         </View>
         {onPress && (
@@ -51,25 +53,25 @@ export const BookingCard: React.FC<BookingCardProps> = ({
 
       <View style={styles.details}>
         <View style={styles.detailRow}>
-          <Calendar size={16} color={colors.gray[500]} />
-          <Text style={styles.detailText}>{formatDate(booking.date)}</Text>
+          <Calendar size={16} color={colors.gray[400]} />
+          <Text style={[styles.detailText, { color: theme.textSecondary }]}>{formatDate(booking.date)}</Text>
         </View>
         <View style={styles.detailRow}>
-          <Clock size={16} color={colors.gray[500]} />
-          <Text style={styles.detailText}>{formatTime(booking.time)}</Text>
+          <Clock size={16} color={colors.gray[400]} />
+          <Text style={[styles.detailText, { color: theme.textSecondary }]}>{formatTime(booking.time)}</Text>
         </View>
         <View style={styles.detailRow}>
-          <MapPin size={16} color={colors.gray[500]} />
-          <Text style={styles.detailText}>{booking.location}</Text>
+          <MapPin size={16} color={colors.gray[400]} />
+          <Text style={[styles.detailText, { color: theme.textSecondary }]}>{booking.location}</Text>
         </View>
         <View style={styles.detailRow}>
-          <User size={16} color={colors.gray[500]} />
-          <Text style={styles.detailText}>{booking.contactName}</Text>
+          <User size={16} color={colors.gray[400]} />
+          <Text style={[styles.detailText, { color: theme.textSecondary }]}>{booking.contactName}</Text>
         </View>
       </View>
 
       {booking.product && (
-        <View style={styles.productTag}>
+        <View style={[styles.productTag, { borderTopColor: theme.border }]}>
           <Text style={styles.productText}>{booking.product}</Text>
         </View>
       )}

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { LucideIcon } from 'lucide-react-native';
 import { colors } from '../../theme';
+import { useTheme } from '../../contexts';
 
 interface DashboardStatCardProps {
   title: string;
@@ -27,13 +28,14 @@ export const DashboardStatCard: React.FC<DashboardStatCardProps> = ({
   trend,
   subtitle,
 }) => {
+  const { theme } = useTheme();
   const content = (
     <>
       <View style={[styles.iconContainer, { backgroundColor: bgColor }]}>
         <Icon size={24} color={color} />
       </View>
-      <Text style={styles.value}>{(value ?? 0).toLocaleString()}</Text>
-      <Text style={styles.title}>{title}</Text>
+      <Text style={[styles.value, { color: theme.text }]}>{(value ?? 0).toLocaleString()}</Text>
+      <Text style={[styles.title, { color: theme.textSecondary }]}>{title}</Text>
       {trend && (
         <View style={styles.trendContainer}>
           <Text
@@ -54,7 +56,7 @@ export const DashboardStatCard: React.FC<DashboardStatCardProps> = ({
   if (onPress) {
     return (
       <TouchableOpacity
-        style={styles.card}
+        style={[styles.card, { backgroundColor: theme.surface }]}
         onPress={onPress}
         activeOpacity={0.7}
       >
@@ -63,7 +65,7 @@ export const DashboardStatCard: React.FC<DashboardStatCardProps> = ({
     );
   }
 
-  return <View style={styles.card}>{content}</View>;
+  return <View style={[styles.card, { backgroundColor: theme.surface }]}>{content}</View>;
 };
 
 const styles = StyleSheet.create({

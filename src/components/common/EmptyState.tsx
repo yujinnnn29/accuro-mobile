@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { Package, Calendar, FileText, Bell, ShoppingCart } from 'lucide-react-native';
 import { colors } from '../../theme';
 import Button from './Button';
+import { useTheme } from '../../contexts';
 
 type IconType = 'package' | 'calendar' | 'file' | 'bell' | 'cart' | 'default';
 
@@ -25,6 +26,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   onAction,
   style,
 }) => {
+  const { theme } = useTheme();
   const getIcon = () => {
     if (customIcon) return customIcon;
 
@@ -49,8 +51,8 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   return (
     <View style={[styles.container, style]}>
       <View style={styles.iconContainer}>{getIcon()}</View>
-      <Text style={styles.title}>{title}</Text>
-      {description && <Text style={styles.description}>{description}</Text>}
+      <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
+      {description && <Text style={[styles.description, { color: theme.textSecondary }]}>{description}</Text>}
       {actionLabel && onAction && (
         <Button
           title={actionLabel}

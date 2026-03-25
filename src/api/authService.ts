@@ -11,8 +11,8 @@ import {
 
 class AuthService {
   async register(data: RegisterData): Promise<AuthResponse> {
-    const response = await api.post<AuthResponse>('/auth/register', data);
-    if (response.data.success && response.data.data.token) {
+    const response = await api.post<AuthResponse>('/auth/register', data, { adapter: 'xhr', timeout: 45000 });
+    if (response.data.success && response.data.data?.token) {
       await storage.setString(STORAGE_KEYS.TOKEN, response.data.data.token);
       await storage.set(STORAGE_KEYS.USER, response.data.data);
     }
@@ -20,7 +20,7 @@ class AuthService {
   }
 
   async login(data: LoginData): Promise<AuthResponse> {
-    const response = await api.post<AuthResponse>('/auth/login', data);
+    const response = await api.post<AuthResponse>('/auth/login', data, { timeout: 180000 });
     if (response.data.success && response.data.data.token) {
       await storage.setString(STORAGE_KEYS.TOKEN, response.data.data.token);
       await storage.set(STORAGE_KEYS.USER, response.data.data);
@@ -89,6 +89,25 @@ class AuthService {
   async isAdmin(): Promise<boolean> {
     const user = await this.getCurrentUser();
     return user !== null && (user.role === 'admin' || user.role === 'superadmin');
+  }
+
+  // Silently ping the backend to wake it up (Render.com free tier cold start)
+  async warmup(): Promise<void> {
+    try {
+      await api.get('/auth/me', { timeout: 30000 });
+    } catch {
+      // Ignore all errors — this is just to warm up the server
+    }
+  }
+
+  async verifyEmail(token: string): Promise<{ success: boolean; message: string }> {
+    const response = await api.get<{ success: boolean; message: string }>(`/auth/verify-email/${token}`);
+    return response.data;
+  }
+
+  async resendVerificationEmail(email: string): Promise<{ success: boolean; message: string }> {
+    const response = await api.post<{ success: boolean; message: string }>('/auth/resend-verification', { email });
+    return response.data;
   }
 }
 

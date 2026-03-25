@@ -29,12 +29,14 @@ export const SignupScreen: React.FC = () => {
   const { register } = useAuth();
 
   const [formData, setFormData] = useState({
-    name: '',
+    firstName: '',
+    middleName: '',
+    lastName: '',
     email: '',
-    password: '',
-    confirmPassword: '',
     phone: '',
     company: '',
+    password: '',
+    confirmPassword: '',
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -46,7 +48,6 @@ export const SignupScreen: React.FC = () => {
 
   const updateField = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
@@ -55,16 +56,26 @@ export const SignupScreen: React.FC = () => {
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = 'Name is required';
-    } else if (formData.name.trim().length < 2) {
-      newErrors.name = 'Name must be at least 2 characters';
+    if (!formData.firstName.trim()) {
+      newErrors.firstName = 'First name is required';
+    } else if (formData.firstName.trim().length < 2) {
+      newErrors.firstName = 'First name must be at least 2 characters';
+    }
+
+    if (!formData.lastName.trim()) {
+      newErrors.lastName = 'Last name is required';
+    } else if (formData.lastName.trim().length < 2) {
+      newErrors.lastName = 'Last name must be at least 2 characters';
     }
 
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
     } else if (!isValidEmail(formData.email)) {
       newErrors.email = 'Please enter a valid email';
+    }
+
+    if (formData.phone && !isValidPhone(formData.phone)) {
+      newErrors.phone = 'Please enter a valid phone number';
     }
 
     if (!formData.password) {
@@ -79,10 +90,6 @@ export const SignupScreen: React.FC = () => {
       newErrors.confirmPassword = 'Passwords do not match';
     }
 
-    if (formData.phone && !isValidPhone(formData.phone)) {
-      newErrors.phone = 'Please enter a valid phone number';
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -90,10 +97,18 @@ export const SignupScreen: React.FC = () => {
   const handleSignup = async () => {
     if (!validateForm()) return;
 
+    const fullName = [
+      formData.firstName.trim(),
+      formData.middleName.trim(),
+      formData.lastName.trim(),
+    ]
+      .filter(Boolean)
+      .join(' ');
+
     setLoading(true);
     try {
       await register({
-        name: formData.name.trim(),
+        name: fullName,
         email: formData.email.trim(),
         password: formData.password,
         phone: formData.phone.trim() || undefined,
@@ -105,7 +120,21 @@ export const SignupScreen: React.FC = () => {
         [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
       );
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Registration failed. Please try again.';
+      const data = error.response?.data;
+      const topMessage = data?.message || data?.error || data?.msg;
+      const fieldErrors: string[] = Array.isArray(data?.errors)
+        ? data.errors.map((e: any) => e.msg || e.message || e.field).filter(Boolean)
+        : [];
+      const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
+      const isNetwork = !error.response && (error.message === 'Network Error' || error.code === 'ERR_NETWORK');
+      const message =
+        (topMessage && fieldErrors.length > 0 ? `${topMessage}:\n• ${fieldErrors.join('\n• ')}` : null) ||
+        topMessage ||
+        fieldErrors.join(', ') ||
+        (isTimeout ? 'Request timed out. Please try again.' : null) ||
+        (isNetwork ? 'Network error. Please check your connection and try again.' : null) ||
+        error.message ||
+        'Registration failed. Please try again.';
       Alert.alert('Registration Error', message);
     } finally {
       setLoading(false);
@@ -114,23 +143,17 @@ export const SignupScreen: React.FC = () => {
 
   const getStrengthColor = () => {
     switch (passwordValidation.strength) {
-      case 'strong':
-        return colors.success;
-      case 'medium':
-        return colors.warning;
-      default:
-        return colors.error;
+      case 'strong': return colors.success;
+      case 'medium': return colors.warning;
+      default: return colors.error;
     }
   };
 
   const getStrengthWidth = () => {
     switch (passwordValidation.strength) {
-      case 'strong':
-        return '100%';
-      case 'medium':
-        return '66%';
-      default:
-        return '33%';
+      case 'strong': return '100%';
+      case 'medium': return '66%';
+      default: return '33%';
     }
   };
 
@@ -151,16 +174,39 @@ export const SignupScreen: React.FC = () => {
         </View>
 
         <View style={styles.form}>
+          {/* First Name */}
           <Input
-            label="Full Name *"
-            placeholder="Enter your full name"
-            value={formData.name}
-            onChangeText={(value) => updateField('name', value)}
+            label="First Name *"
+            placeholder="Enter your first name"
+            value={formData.firstName}
+            onChangeText={(value) => updateField('firstName', value)}
             autoCapitalize="words"
-            error={errors.name}
+            error={errors.firstName}
             leftIcon={<User size={20} color={colors.gray[400]} />}
           />
 
+          {/* Middle Name */}
+          <Input
+            label="Middle Name (Optional)"
+            placeholder="Enter your middle name"
+            value={formData.middleName}
+            onChangeText={(value) => updateField('middleName', value)}
+            autoCapitalize="words"
+            leftIcon={<User size={20} color={colors.gray[400]} />}
+          />
+
+          {/* Last Name */}
+          <Input
+            label="Last Name *"
+            placeholder="Enter your last name"
+            value={formData.lastName}
+            onChangeText={(value) => updateField('lastName', value)}
+            autoCapitalize="words"
+            error={errors.lastName}
+            leftIcon={<User size={20} color={colors.gray[400]} />}
+          />
+
+          {/* Email Address */}
           <Input
             label="Email Address *"
             placeholder="Enter your email"
@@ -173,43 +219,7 @@ export const SignupScreen: React.FC = () => {
             leftIcon={<Mail size={20} color={colors.gray[400]} />}
           />
 
-          <Input
-            label="Password *"
-            placeholder="Create a password"
-            value={formData.password}
-            onChangeText={(value) => updateField('password', value)}
-            isPassword
-            error={errors.password}
-            leftIcon={<Lock size={20} color={colors.gray[400]} />}
-          />
-
-          {formData.password.length > 0 && (
-            <View style={styles.passwordStrength}>
-              <View style={styles.strengthBar}>
-                <View
-                  style={[
-                    styles.strengthFill,
-                    { width: getStrengthWidth(), backgroundColor: getStrengthColor() },
-                  ]}
-                />
-              </View>
-              <Text style={[styles.strengthText, { color: getStrengthColor() }]}>
-                {passwordValidation.strength.charAt(0).toUpperCase() +
-                  passwordValidation.strength.slice(1)}
-              </Text>
-            </View>
-          )}
-
-          <Input
-            label="Confirm Password *"
-            placeholder="Confirm your password"
-            value={formData.confirmPassword}
-            onChangeText={(value) => updateField('confirmPassword', value)}
-            isPassword
-            error={errors.confirmPassword}
-            leftIcon={<Lock size={20} color={colors.gray[400]} />}
-          />
-
+          {/* Phone Number */}
           <Input
             label="Phone Number"
             placeholder="Enter your phone number"
@@ -220,12 +230,71 @@ export const SignupScreen: React.FC = () => {
             leftIcon={<Phone size={20} color={colors.gray[400]} />}
           />
 
+          {/* Company Name */}
           <Input
-            label="Company"
+            label="Company Name"
             placeholder="Enter your company name"
             value={formData.company}
             onChangeText={(value) => updateField('company', value)}
             leftIcon={<Building size={20} color={colors.gray[400]} />}
+          />
+
+          {/* Password */}
+          <Input
+            label="Password *"
+            placeholder="Create a password"
+            value={formData.password}
+            onChangeText={(value) => updateField('password', value)}
+            isPassword
+            error={errors.password}
+            leftIcon={<Lock size={20} color={colors.gray[400]} />}
+          />
+
+          {/* Password strength & requirements */}
+          {formData.password.length > 0 && (
+            <View style={styles.passwordStrengthBlock}>
+              <View style={styles.passwordStrength}>
+                <View style={styles.strengthBar}>
+                  <View
+                    style={[
+                      styles.strengthFill,
+                      { width: getStrengthWidth(), backgroundColor: getStrengthColor() },
+                    ]}
+                  />
+                </View>
+                <Text style={[styles.strengthText, { color: getStrengthColor() }]}>
+                  {passwordValidation.strength.charAt(0).toUpperCase() +
+                    passwordValidation.strength.slice(1)}
+                </Text>
+              </View>
+              <View style={styles.requirementsList}>
+                {[
+                  { label: 'At least 8 characters', met: formData.password.length >= 8 },
+                  { label: 'At least one uppercase letter', met: /[A-Z]/.test(formData.password) },
+                  { label: 'At least one lowercase letter', met: /[a-z]/.test(formData.password) },
+                  { label: 'At least one number', met: /[0-9]/.test(formData.password) },
+                  { label: 'At least one special character (!@#$%^&*)', met: /[!@#$%^&*]/.test(formData.password) },
+                ].map((req, i) => (
+                  <Text
+                    key={i}
+                    style={[styles.requirementItem, { color: req.met ? colors.success : colors.gray[400] }]}
+                  >
+                    {req.met ? '✓' : '○'} {req.label}
+                  </Text>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Confirm Password */}
+          <Input
+            label="Confirm Password *"
+            placeholder="Confirm your password"
+            value={formData.confirmPassword}
+            onChangeText={(value) => updateField('confirmPassword', value)}
+            isPassword
+            error={errors.confirmPassword}
+            leftIcon={<Lock size={20} color={colors.gray[400]} />}
           />
 
           <Button
@@ -283,11 +352,14 @@ const styles = StyleSheet.create({
   form: {
     marginBottom: 24,
   },
+  passwordStrengthBlock: {
+    marginTop: -12,
+    marginBottom: 16,
+  },
   passwordStrength: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: -12,
-    marginBottom: 16,
+    marginBottom: 8,
   },
   strengthBar: {
     flex: 1,
@@ -303,6 +375,12 @@ const styles = StyleSheet.create({
   strengthText: {
     fontSize: 12,
     fontWeight: '500',
+  },
+  requirementsList: {
+    gap: 4,
+  },
+  requirementItem: {
+    fontSize: 12,
   },
   signupButton: {
     marginTop: 8,

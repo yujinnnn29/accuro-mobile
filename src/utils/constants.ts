@@ -10,14 +10,15 @@ export const STORAGE_KEYS = {
   THEME: 'theme',
 } as const;
 
-// Booking Purposes
+// Booking Purposes (matches website)
 export const BOOKING_PURPOSES = [
   'Product Demonstration',
-  'Software Training',
-  'General Inquiry',
-  'Calibration Services',
-  'Maintenance Support',
   'Technical Consultation',
+  'Calibration Services',
+  'Software Training',
+  'Maintenance Support',
+  'General Inquiry',
+  'Other',
 ] as const;
 
 // Booking Locations
@@ -38,6 +39,19 @@ export const PRODUCT_CATEGORIES = [
   'Accessories',
 ] as const;
 
+// Product/Service of Interest for Quotations (matches website)
+export const QUOTATION_SERVICES = [
+  'Beamex Calibrators',
+  'Beamex Calibration Benches',
+  'Beamex Calibration Software',
+  'Beamex Calibration Accessories',
+  'Beamex Pressure Measurement',
+  'Beamex Temperature Measurement',
+  'Beamex Electrical Measurement',
+  'Beamex Integrated Solutions',
+  'Not sure / Need recommendation',
+] as const;
+
 // Status Colors
 export const STATUS_COLORS = {
   pending: '#EAB308',
@@ -45,6 +59,7 @@ export const STATUS_COLORS = {
   completed: '#22C55E',
   cancelled: '#EF4444',
   rescheduled: '#A855F7',
+  pending_review: '#0891B2',
 } as const;
 
 // User Roles

@@ -36,6 +36,8 @@ export interface ProductFilters {
   category?: string;
   status?: ProductStatus | 'All';
   search?: string;
+  limit?: number;
+  page?: number;
 }
 
 export interface CartItem {

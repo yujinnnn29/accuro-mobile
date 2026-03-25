@@ -5,6 +5,7 @@ import { LucideIcon } from 'lucide-react-native';
 import { colors } from '../../theme';
 import { PendingAction } from '../../types';
 import { Card, Badge } from '../common';
+import { useTheme } from '../../contexts';
 
 interface PendingActionsCardProps {
   items: PendingAction[];
@@ -43,6 +44,7 @@ export const PendingActionsCard: React.FC<PendingActionsCardProps> = ({
   onViewAll,
   loading,
 }) => {
+  const { theme } = useTheme();
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -67,7 +69,7 @@ export const PendingActionsCard: React.FC<PendingActionsCardProps> = ({
 
     return (
       <TouchableOpacity
-        style={styles.actionItem}
+        style={[styles.actionItem, { borderBottomColor: theme.border }]}
         onPress={() => onItemPress?.(item)}
         activeOpacity={0.7}
       >
@@ -76,7 +78,7 @@ export const PendingActionsCard: React.FC<PendingActionsCardProps> = ({
         </View>
         <View style={styles.itemContent}>
           <View style={styles.itemHeader}>
-            <Text style={styles.itemTitle} numberOfLines={1}>
+            <Text style={[styles.itemTitle, { color: theme.text }]} numberOfLines={1}>
               {item.title}
             </Text>
             <Badge
@@ -85,7 +87,7 @@ export const PendingActionsCard: React.FC<PendingActionsCardProps> = ({
               size="sm"
             />
           </View>
-          <Text style={styles.itemDescription} numberOfLines={1}>
+          <Text style={[styles.itemDescription, { color: theme.textSecondary }]} numberOfLines={1}>
             {item.description}
           </Text>
           <Text style={styles.itemTime}>{formatDate(item.createdAt)}</Text>
@@ -105,10 +107,10 @@ export const PendingActionsCard: React.FC<PendingActionsCardProps> = ({
 
   return (
     <Card style={styles.card} padding="none">
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <View>
-          <Text style={styles.title}>Needs Approval</Text>
-          <Text style={styles.subtitle}>
+          <Text style={[styles.title, { color: theme.text }]}>Needs Approval</Text>
+          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
             {items.length} item{items.length !== 1 ? 's' : ''} pending
           </Text>
         </View>
