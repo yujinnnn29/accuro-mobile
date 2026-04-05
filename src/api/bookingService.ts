@@ -92,6 +92,16 @@ class BookingService {
     });
     return response.data;
   }
+
+  async getMyAssignments(params?: { status?: string }): Promise<BookingsResponse> {
+    const response = await api.get<BookingsResponse>('/bookings/my-assignments', { params, adapter: 'xhr' });
+    return normalizeResponse(response.data, []) as unknown as BookingsResponse;
+  }
+
+  async startBooking(id: string): Promise<BookingResponse> {
+    const response = await api.put<BookingResponse>(`/bookings/${id}/start`, {}, { adapter: 'xhr' });
+    return response.data;
+  }
 }
 
 export const bookingService = new BookingService();

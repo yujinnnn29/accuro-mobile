@@ -1,8 +1,11 @@
-export type UserRole = 'user' | 'admin' | 'superadmin';
+export type UserRole = 'user' | 'technician' | 'admin' | 'superadmin';
 
 export interface User {
   _id: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
+  middleName?: string;
   email: string;
   role: UserRole;
   phone?: string;
@@ -11,6 +14,8 @@ export interface User {
   isEmailVerified: boolean;
   loginCount?: number;
   lastLoginAt?: string;
+  technicianNumber?: number;
+  specialization?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -21,12 +26,16 @@ export interface LoginData {
 }
 
 export interface RegisterData {
-  name: string;
+  firstName: string;
+  lastName: string;
+  middleName?: string;
+  name?: string;
   email: string;
   password: string;
   phone?: string;
   company?: string;
   profilePicture?: string;
+  specialization?: string;
 }
 
 export interface AuthResponse {

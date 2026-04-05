@@ -64,7 +64,7 @@ export const MyQuotationsScreen: React.FC = () => {
   });
 
   const handleQuotationPress = (quotation: Quotation) => {
-    navigation.navigate('QuotationDetail', { quotationId: quotation._id });
+    navigation.navigate('QuotationDetail', { quotationId: quotation._id, quotation });
   };
 
   const getFilterCounts = () => {

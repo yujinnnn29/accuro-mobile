@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -30,17 +31,20 @@ import {
   MapPin,
   Truck,
   MessageSquare,
+  ArrowLeft,
 } from 'lucide-react-native';
 import { useAuth, useCart, useTheme } from '../../contexts';
 import { bookingService, quotationService, recommendationService, purchaseHistoryService, activityLogService, quoteService, reviewService } from '../../api';
-import activityService, { ActivityStats } from '../../api/activityService';
+import { ActivityStats } from '../../api/activityService';
 import { getProductById } from '../../data/products';
 import { colors } from '../../theme';
 import { Card, Badge, LoadingSpinner } from '../../components/common';
 import { HomeStackParamList } from '../../navigation/types';
 
-type NavigationProp = NativeStackNavigationProp<HomeStackParamList>;
+type NavigationProp = NativeStackNavigationProp<HomeStackParamList> & { getParent: () => any };
 type TabType = 'bookings' | 'purchases' | 'quotes' | 'reviews' | 'activity';
+
+const CACHE_KEY = 'user_dashboard_cache';
 
 export const UserDashboardScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
@@ -53,11 +57,6 @@ export const UserDashboardScreen: React.FC = () => {
   // Activity stats
   const [stats, setStats] = useState<ActivityStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
-
-  // Service & Quotation progress
-  const [progressBookings, setProgressBookings] = useState<any[]>([]);
-  const [progressQuotations, setProgressQuotations] = useState<any[]>([]);
-  const [progressLoading, setProgressLoading] = useState(true);
 
   // Recommendations
   const [recommendations, setRecommendations] = useState<any[]>([]);
@@ -72,58 +71,85 @@ export const UserDashboardScreen: React.FC = () => {
   const [reviews, setReviews] = useState<any[]>([]);
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
 
-  const fetchStats = useCallback(async () => {
+  // Track which tabs have been fetched this session
+  const fetchedTabs = useRef<Set<TabType>>(new Set());
+
+  const computeAndSetStats = (allBookings: any[], allQuotations: any[]) => {
+    setStats({
+      bookings: {
+        total: allBookings.length,
+        pending: allBookings.filter((b: any) => b.status === 'pending').length,
+        confirmed: allBookings.filter((b: any) => b.status === 'confirmed').length,
+        completed: allBookings.filter((b: any) => b.status === 'completed').length,
+        cancelled: allBookings.filter((b: any) => b.status === 'cancelled').length,
+      },
+      quotations: {
+        total: allQuotations.length,
+        pending: allQuotations.filter((q: any) => q.status === 'pending').length,
+        approved: allQuotations.filter((q: any) => q.status === 'approved' || q.status === 'accepted').length,
+        rejected: allQuotations.filter((q: any) => q.status === 'rejected').length,
+      },
+      reviews: { total: 0, pending: 0 },
+    });
+  };
+
+  const fetchAllData = useCallback(async () => {
     try {
-      setStatsLoading(true);
-      const res = await activityService.getActivityStats();
-      setStats(res.data);
+      // Fetch bookings + quotations in parallel (stats + first tab in one shot)
+      const [bookingsRes, quotationsRes, recRes] = await Promise.allSettled([
+        bookingService.getMyBookings(),
+        quotationService.getMyQuotations(),
+        recommendationService.getRecommendations(5),
+      ]);
+
+      const allBookings = bookingsRes.status === 'fulfilled' ? (bookingsRes.value.data || []) : [];
+      const allQuotations = quotationsRes.status === 'fulfilled' ? (quotationsRes.value.data || []) : [];
+
+      computeAndSetStats(allBookings, allQuotations);
+      setBookings(allBookings);
+      fetchedTabs.current?.add('bookings');
+
+      if (recRes.status === 'fulfilled') {
+        setRecommendations(recRes.value.data || []);
+      }
+
+      // Cache for next open
+      AsyncStorage.setItem(CACHE_KEY, JSON.stringify({
+        stats: {
+          bookings: {
+            total: allBookings.length,
+            pending: allBookings.filter((b: any) => b.status === 'pending').length,
+            confirmed: allBookings.filter((b: any) => b.status === 'confirmed').length,
+            completed: allBookings.filter((b: any) => b.status === 'completed').length,
+            cancelled: allBookings.filter((b: any) => b.status === 'cancelled').length,
+          },
+          quotations: {
+            total: allQuotations.length,
+            pending: allQuotations.filter((q: any) => q.status === 'pending').length,
+            approved: allQuotations.filter((q: any) => q.status === 'approved' || q.status === 'accepted').length,
+            rejected: allQuotations.filter((q: any) => q.status === 'rejected').length,
+          },
+          reviews: { total: 0, pending: 0 },
+        },
+        bookings: allBookings,
+      })).catch(() => {});
     } catch {
       // silently fail
     } finally {
       setStatsLoading(false);
-    }
-  }, []);
-
-  const fetchProgress = useCallback(async () => {
-    try {
-      setProgressLoading(true);
-      const [bookingsRes, quotationsRes] = await Promise.allSettled([
-        bookingService.getMyBookings(),
-        quotationService.getMyQuotations(),
-      ]);
-      if (bookingsRes.status === 'fulfilled') {
-        setProgressBookings((bookingsRes.value.data || []).slice(0, 5));
-      }
-      if (quotationsRes.status === 'fulfilled') {
-        setProgressQuotations((quotationsRes.value.data || []).slice(0, 5));
-      }
-    } catch {
-      // silently fail
-    } finally {
-      setProgressLoading(false);
-    }
-  }, []);
-
-  const fetchRecommendations = useCallback(async () => {
-    try {
-      setRecLoading(true);
-      const res = await recommendationService.getRecommendations(5);
-      setRecommendations(res.data || []);
-    } catch {
-      setRecommendations([]);
-    } finally {
       setRecLoading(false);
+      setTabLoading(false);
+      setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
   const fetchTabData = useCallback(async (tab: TabType) => {
+    if (tab === 'bookings') return; // already fetched in fetchAllData
+    if (fetchedTabs.current?.has(tab) && !refreshing) return; // already loaded this session
     setTabLoading(true);
     try {
       switch (tab) {
-        case 'bookings':
-          const bRes = await bookingService.getMyBookings().catch(() => ({ data: [] }));
-          setBookings(bRes.data || []);
-          break;
         case 'purchases':
           const pRes = await purchaseHistoryService.getMyPurchases().catch(() => ({ data: [] }));
           setPurchases(pRes.data || []);
@@ -141,20 +167,24 @@ export const UserDashboardScreen: React.FC = () => {
           setActivityLogs(aRes.data || []);
           break;
       }
+      fetchedTabs.current?.add(tab);
     } catch {
-      // silently fail - show empty state
+      // silently fail
     } finally {
       setTabLoading(false);
-      setLoading(false);
-      setRefreshing(false);
     }
-  }, []);
+  }, [refreshing]);
 
   useEffect(() => {
-    fetchStats();
-    fetchProgress();
-    fetchRecommendations();
-    fetchTabData('bookings');
+    // Load cache instantly, then fetch fresh data in background
+    AsyncStorage.getItem(CACHE_KEY).then(cached => {
+      if (cached) {
+        const data = JSON.parse(cached);
+        if (data.stats) { setStats(data.stats); setStatsLoading(false); }
+        if (data.bookings) { setBookings(data.bookings); setLoading(false); setTabLoading(false); }
+      }
+    }).catch(() => {});
+    fetchAllData();
   }, []);
 
   useEffect(() => {
@@ -163,46 +193,9 @@ export const UserDashboardScreen: React.FC = () => {
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchStats();
-    fetchProgress();
-    fetchRecommendations();
-    fetchTabData(activeTab);
-  };
-
-  const getBookingProgressColor = (status: string) => {
-    switch (status) {
-      case 'completed': return colors.success;
-      case 'confirmed': return colors.primary[600];
-      case 'pending': return colors.warning;
-      case 'cancelled': return colors.error;
-      default: return colors.gray[400];
-    }
-  };
-
-  const getBookingProgressWidth = (status: string) => {
-    switch (status) {
-      case 'completed': return '100%';
-      case 'confirmed': return '66%';
-      case 'pending': return '33%';
-      default: return '0%';
-    }
-  };
-
-  const getQuotationProgressColor = (status: string) => {
-    switch (status) {
-      case 'approved': return colors.success;
-      case 'pending': return colors.warning;
-      case 'rejected': return colors.error;
-      default: return colors.gray[400];
-    }
-  };
-
-  const getQuotationProgressWidth = (status: string) => {
-    switch (status) {
-      case 'approved': return '100%';
-      case 'pending': return '50%';
-      default: return '25%';
-    }
+    if (fetchedTabs.current) fetchedTabs.current.clear();
+    fetchAllData();
+    if (activeTab !== 'bookings') fetchTabData(activeTab);
   };
 
   const isNewUser = stats ? stats.bookings.total === 0 && stats.quotations.total === 0 : false;
@@ -239,7 +232,7 @@ export const UserDashboardScreen: React.FC = () => {
           <Calendar size={40} color={colors.gray[300]} />
           <Text style={[styles.emptyTitle, { color: theme.text }]}>No Bookings Yet</Text>
           <Text style={[styles.emptyText, { color: theme.textSecondary }]}>You haven't created any bookings yet</Text>
-          <TouchableOpacity style={styles.emptyAction} onPress={() => navigation.navigate('Booking', {})}>
+          <TouchableOpacity style={styles.emptyAction} onPress={() => navigation.getParent()?.navigate('HomeTab', { screen: 'Booking', params: {} })}>
             <Text style={styles.emptyActionText}>Create Booking</Text>
           </TouchableOpacity>
         </View>
@@ -304,7 +297,7 @@ export const UserDashboardScreen: React.FC = () => {
           <FileText size={40} color={colors.gray[300]} />
           <Text style={[styles.emptyTitle, { color: theme.text }]}>No Quote Requests</Text>
           <Text style={[styles.emptyText, { color: theme.textSecondary }]}>You haven't requested any quotes yet</Text>
-          <TouchableOpacity style={styles.emptyAction} onPress={() => navigation.navigate('Products')}>
+          <TouchableOpacity style={styles.emptyAction} onPress={() => navigation.getParent()?.navigate('HomeTab', { screen: 'Products' })}>
             <Text style={styles.emptyActionText}>Browse Products</Text>
           </TouchableOpacity>
         </View>
@@ -399,6 +392,11 @@ export const UserDashboardScreen: React.FC = () => {
       >
         {/* Welcome Header */}
         <View style={styles.header}>
+          {navigation.canGoBack() && (
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+              <ArrowLeft size={22} color={colors.white} />
+            </TouchableOpacity>
+          )}
           <Text style={styles.greeting}>{getGreeting()},</Text>
           <Text style={styles.userName}>{user?.name || 'User'}</Text>
           {user?.company && <Text style={styles.company}>{user.company}</Text>}
@@ -416,7 +414,7 @@ export const UserDashboardScreen: React.FC = () => {
                 borderColor: colors.primary[600],
                 iconBg: colors.primary[50],
                 iconColor: colors.primary[600],
-                onPress: () => navigation.navigate('Products'),
+                onPress: () => navigation.getParent()?.navigate('HomeTab', { screen: 'Products' }),
               },
               {
                 icon: FileText,
@@ -425,7 +423,7 @@ export const UserDashboardScreen: React.FC = () => {
                 borderColor: '#059669',
                 iconBg: '#f0fdf4',
                 iconColor: '#059669',
-                onPress: () => navigation.navigate('RequestQuote', {}),
+                onPress: () => navigation.getParent()?.navigate('HomeTab', { screen: 'RequestQuote', params: {} }),
               },
               {
                 icon: Calendar,
@@ -434,7 +432,7 @@ export const UserDashboardScreen: React.FC = () => {
                 borderColor: '#7c3aed',
                 iconBg: '#f5f3ff',
                 iconColor: '#7c3aed',
-                onPress: () => navigation.navigate('Booking', {}),
+                onPress: () => navigation.getParent()?.navigate('HomeTab', { screen: 'Booking', params: {} }),
               },
             ].map((action, index) => (
               <TouchableOpacity key={index} style={[styles.quickActionCard, { borderLeftColor: action.borderColor, backgroundColor: theme.surface }]} onPress={action.onPress} activeOpacity={0.7}>
@@ -452,28 +450,26 @@ export const UserDashboardScreen: React.FC = () => {
         </View>
 
         {/* Activity Stats */}
-        {!statsLoading && stats && !isNewUser && (
-          <View style={styles.section}>
-            <View style={styles.statsGrid}>
-              <View style={[styles.statCard, { backgroundColor: colors.primary[600] }]}>
-                <Text style={styles.statValue}>{stats.bookings.total}</Text>
-                <Text style={styles.statLabel}>Total Bookings</Text>
-              </View>
-              <View style={[styles.statCard, { backgroundColor: colors.success }]}>
-                <Text style={styles.statValue}>{stats.bookings.completed}</Text>
-                <Text style={styles.statLabel}>Completed</Text>
-              </View>
-              <View style={[styles.statCard, { backgroundColor: '#059669' }]}>
-                <Text style={styles.statValue}>{stats.quotations.total}</Text>
-                <Text style={styles.statLabel}>Quotations</Text>
-              </View>
-              <View style={[styles.statCard, { backgroundColor: '#16A34A' }]}>
-                <Text style={styles.statValue}>{stats.quotations.approved}</Text>
-                <Text style={styles.statLabel}>Approved</Text>
-              </View>
+        <View style={styles.section}>
+          <View style={styles.statsGrid}>
+            <View style={[styles.statCard, { backgroundColor: colors.primary[600] }]}>
+              <Text style={styles.statValue}>{statsLoading ? '—' : (stats?.bookings.total ?? 0)}</Text>
+              <Text style={styles.statLabel}>Total Bookings</Text>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: colors.success }]}>
+              <Text style={styles.statValue}>{statsLoading ? '—' : (stats?.bookings.completed ?? 0)}</Text>
+              <Text style={styles.statLabel}>Completed</Text>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: '#059669' }]}>
+              <Text style={styles.statValue}>{statsLoading ? '—' : (stats?.quotations.total ?? 0)}</Text>
+              <Text style={styles.statLabel}>Quotations</Text>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: '#16A34A' }]}>
+              <Text style={styles.statValue}>{statsLoading ? '—' : (stats?.quotations.approved ?? 0)}</Text>
+              <Text style={styles.statLabel}>Approved</Text>
             </View>
           </View>
-        )}
+        </View>
 
         {/* Getting Started (new users) */}
         {!statsLoading && isNewUser && (
@@ -482,9 +478,9 @@ export const UserDashboardScreen: React.FC = () => {
               <Text style={[styles.gettingStartedTitle, { color: theme.text }]}>Getting Started</Text>
               <Text style={[styles.gettingStartedSubtitle, { color: theme.textSecondary }]}>Complete these steps to get the most out of Accuro</Text>
               {[
-                { label: 'Browse our product catalog', done: false, onPress: () => navigation.navigate('Products') },
-                { label: 'Book a meeting with our team', done: false, onPress: () => navigation.navigate('Booking', {}) },
-                { label: 'Request a product quotation', done: false, onPress: () => navigation.navigate('RequestQuote', {}) },
+                { label: 'Browse our product catalog', done: false, onPress: () => navigation.getParent()?.navigate('HomeTab', { screen: 'Products' }) },
+                { label: 'Book a meeting with our team', done: false, onPress: () => navigation.getParent()?.navigate('HomeTab', { screen: 'Booking', params: {} }) },
+                { label: 'Request a product quotation', done: false, onPress: () => navigation.getParent()?.navigate('HomeTab', { screen: 'RequestQuote', params: {} }) },
               ].map((step, i) => (
                 <TouchableOpacity key={i} style={[styles.gettingStartedStep, { borderBottomColor: theme.border }]} onPress={step.onPress}>
                   <View style={[styles.gettingStartedDot, step.done && { backgroundColor: colors.success }]}>
@@ -495,41 +491,6 @@ export const UserDashboardScreen: React.FC = () => {
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
-        )}
-
-        {/* Service & Quotation Progress */}
-        {!progressLoading && (progressBookings.length > 0 || progressQuotations.length > 0) && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Your Progress</Text>
-            {progressBookings.map((booking: any) => (
-              <View key={booking._id} style={[styles.progressCard, { backgroundColor: theme.surface }]}>
-                <View style={styles.progressCardHeader}>
-                  <Calendar size={16} color={colors.primary[600]} />
-                  <Text style={[styles.progressCardTitle, { color: theme.text }]} numberOfLines={1}>{booking.company || 'Booking'}</Text>
-                  <View style={[styles.progressBadge, { backgroundColor: getBookingProgressColor(booking.status) + '20' }]}>
-                    <Text style={[styles.progressBadgeText, { color: getBookingProgressColor(booking.status) }]}>{booking.status}</Text>
-                  </View>
-                </View>
-                <View style={[styles.progressBarTrack, { backgroundColor: theme.border }]}>
-                  <View style={[styles.progressBarFill, { width: getBookingProgressWidth(booking.status) as any, backgroundColor: getBookingProgressColor(booking.status) }]} />
-                </View>
-              </View>
-            ))}
-            {progressQuotations.map((q: any) => (
-              <View key={q._id} style={[styles.progressCard, { backgroundColor: theme.surface }]}>
-                <View style={styles.progressCardHeader}>
-                  <FileText size={16} color={colors.success} />
-                  <Text style={[styles.progressCardTitle, { color: theme.text }]} numberOfLines={1}>Quotation #{q._id?.slice(-6)}</Text>
-                  <View style={[styles.progressBadge, { backgroundColor: getQuotationProgressColor(q.status) + '20' }]}>
-                    <Text style={[styles.progressBadgeText, { color: getQuotationProgressColor(q.status) }]}>{q.status}</Text>
-                  </View>
-                </View>
-                <View style={[styles.progressBarTrack, { backgroundColor: theme.border }]}>
-                  <View style={[styles.progressBarFill, { width: getQuotationProgressWidth(q.status) as any, backgroundColor: getQuotationProgressColor(q.status) }]} />
-                </View>
-              </View>
-            ))}
           </View>
         )}
 
@@ -550,7 +511,7 @@ export const UserDashboardScreen: React.FC = () => {
                   <TouchableOpacity
                     key={product!._id}
                     style={[styles.recCard, { backgroundColor: theme.surface }]}
-                    onPress={() => navigation.navigate('ProductDetail', { productId: product!._id })}
+                    onPress={() => navigation.getParent()?.navigate('HomeTab', { screen: 'ProductDetail', params: { productId: product!._id } })}
                     activeOpacity={0.8}
                   >
                     <Image source={{ uri: product!.image }} style={styles.recImage} />
@@ -642,6 +603,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary[600],
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
+  },
+  backButton: {
+    marginBottom: 8,
+    alignSelf: 'flex-start',
+    padding: 4,
   },
   greeting: { fontSize: 16, color: colors.primary[200] },
   userName: { fontSize: 28, fontWeight: 'bold', color: colors.white, marginTop: 4 },

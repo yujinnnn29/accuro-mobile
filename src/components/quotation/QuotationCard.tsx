@@ -16,7 +16,7 @@ export interface Quotation {
   _id: string;
   quotationNumber: string;
   items: QuotationItem[];
-  status: 'pending' | 'approved' | 'rejected' | 'expired';
+  status: 'pending' | 'quoted' | 'approved' | 'accepted' | 'declined' | 'rejected' | 'expired';
   totalAmount?: number;
   validUntil?: string;
   createdAt: string;

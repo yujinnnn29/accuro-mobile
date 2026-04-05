@@ -97,18 +97,15 @@ export const SignupScreen: React.FC = () => {
   const handleSignup = async () => {
     if (!validateForm()) return;
 
-    const fullName = [
-      formData.firstName.trim(),
-      formData.middleName.trim(),
-      formData.lastName.trim(),
-    ]
-      .filter(Boolean)
-      .join(' ');
+    const toProperCase = (str: string) =>
+      str.trim().replace(/\b\w/g, c => c.toUpperCase());
 
     setLoading(true);
     try {
       await register({
-        name: fullName,
+        firstName: toProperCase(formData.firstName),
+        lastName: toProperCase(formData.lastName),
+        middleName: formData.middleName.trim() ? toProperCase(formData.middleName) : undefined,
         email: formData.email.trim(),
         password: formData.password,
         phone: formData.phone.trim() || undefined,

@@ -24,7 +24,7 @@ export interface Quotation {
   userId: string;
   quotationNumber: string;
   items: QuotationItem[];
-  status: 'pending' | 'approved' | 'rejected' | 'expired';
+  status: 'pending' | 'quoted' | 'approved' | 'accepted' | 'declined' | 'rejected' | 'expired';
   totalAmount?: number;
   currency?: string;
   validUntil?: string;
@@ -62,7 +62,7 @@ export interface QuotationsResponse {
 }
 
 export interface QuotationFilters {
-  status?: 'pending' | 'approved' | 'rejected' | 'expired';
+  status?: 'pending' | 'quoted' | 'approved' | 'accepted' | 'declined' | 'rejected' | 'expired';
   page?: number;
   limit?: number;
 }
@@ -82,13 +82,13 @@ export const quotationService = {
 
   // Get user's quotations
   getMyQuotations: async (filters?: QuotationFilters): Promise<QuotationsResponse> => {
-    const response = await api.get('/quotations', { params: filters });
+    const response = await api.get('/quotations', { params: filters, adapter: 'xhr' });
     return response.data;
   },
 
   // Get single quotation
   getQuotation: async (id: string): Promise<QuotationResponse> => {
-    const response = await api.get(`/quotations/${id}`);
+    const response = await api.get(`/quotations/${id}`, { adapter: 'xhr' });
     return response.data;
   },
 
@@ -104,6 +104,18 @@ export const quotationService = {
   // Reject quotation (admin)
   rejectQuotation: async (id: string, reason?: string): Promise<QuotationResponse> => {
     const response = await api.put(`/quotations/${id}/reject`, { reason });
+    return response.data;
+  },
+
+  // Accept quotation (customer)
+  acceptQuotation: async (id: string): Promise<QuotationResponse> => {
+    const response = await api.put(`/quotations/${id}/accept`, {}, { adapter: 'xhr' });
+    return response.data;
+  },
+
+  // Decline quotation (customer)
+  declineQuotation: async (id: string, reason?: string): Promise<QuotationResponse> => {
+    const response = await api.put(`/quotations/${id}/decline`, { reason }, { adapter: 'xhr' });
     return response.data;
   },
 

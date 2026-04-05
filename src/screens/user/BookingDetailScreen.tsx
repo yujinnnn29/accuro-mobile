@@ -25,7 +25,9 @@ import {
   CheckCircle,
   XCircle,
   RefreshCw,
+  Wrench,
 } from 'lucide-react-native';
+import { AssignedTechnician } from '../../types';
 import { bookingService } from '../../api';
 import { Booking } from '../../types';
 import { colors } from '../../theme';
@@ -122,11 +124,11 @@ export const BookingDetailScreen: React.FC = () => {
     const statuses = [
       { key: 'pending', label: 'Submitted', icon: FileText },
       { key: 'confirmed', label: 'Confirmed', icon: CheckCircle },
+      { key: 'in_progress', label: 'In Progress', icon: RefreshCw },
       { key: 'completed', label: 'Completed', icon: CheckCircle },
     ];
 
     const status = booking?.status;
-    // For rescheduled/pending_review, highlight the confirmed step as current
     const effectiveStatus =
       status === 'rescheduled' || status === 'pending_review' ? 'confirmed' : status;
     const currentIndex = statuses.findIndex((s) => s.key === effectiveStatus);
@@ -377,6 +379,47 @@ export const BookingDetailScreen: React.FC = () => {
             </View>
           </View>
         </Card>
+
+        {/* Assigned Technician */}
+        {booking.assignedTechnician && typeof booking.assignedTechnician === 'object' && (
+          <Card style={styles.infoCard} padding="lg">
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Assigned Technician</Text>
+            <View style={[styles.infoRow, { borderBottomColor: theme.border }]}>
+              <View style={styles.infoIcon}><Wrench size={18} color={colors.primary[600]} /></View>
+              <View style={styles.infoContent}>
+                <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>Name</Text>
+                <Text style={[styles.infoValue, { color: theme.text }]}>
+                  {(booking.assignedTechnician as AssignedTechnician).name}
+                  {(booking.assignedTechnician as AssignedTechnician).technicianNumber
+                    ? ` (#${(booking.assignedTechnician as AssignedTechnician).technicianNumber})`
+                    : ''}
+                </Text>
+              </View>
+            </View>
+            {(booking.assignedTechnician as AssignedTechnician).specialization && (
+              <View style={[styles.infoRow, { borderBottomColor: theme.border }]}>
+                <View style={styles.infoIcon}><FileText size={18} color={colors.primary[600]} /></View>
+                <View style={styles.infoContent}>
+                  <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>Specialization</Text>
+                  <Text style={[styles.infoValue, { color: theme.text }]}>
+                    {(booking.assignedTechnician as AssignedTechnician).specialization}
+                  </Text>
+                </View>
+              </View>
+            )}
+            {(booking.assignedTechnician as AssignedTechnician).phone && (
+              <View style={[styles.infoRow, styles.lastInfoRow]}>
+                <View style={styles.infoIcon}><Phone size={18} color={colors.primary[600]} /></View>
+                <View style={styles.infoContent}>
+                  <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>Phone</Text>
+                  <Text style={[styles.infoValue, { color: theme.text }]}>
+                    {(booking.assignedTechnician as AssignedTechnician).phone}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </Card>
+        )}
 
         {/* Actions */}
         {canCancel && (

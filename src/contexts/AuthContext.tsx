@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { InteractionManager } from 'react-native';
 import { authService } from '../api';
 import { User, LoginData, RegisterData } from '../types';
 
@@ -14,6 +13,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   isSuperAdmin: boolean;
+  isTechnician: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -43,12 +43,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (cachedUser) {
           setUser(cachedUser);
           setLoading(false);
-          // Silently refresh from server after UI is interactive
-          InteractionManager.runAfterInteractions(() => {
-            authService.getMe()
-              .then(response => { if (response.success) setUser(response.data); })
-              .catch(() => { /* ignore — cached data is still valid */ });
-          });
+          // Silently refresh from server immediately (no waiting for interactions) so the
+          // server warms up as early as possible — reduces cold-start delay on dashboard.
+          authService.getMe()
+            .then(response => {
+              if (response.success) {
+                // Merge profile data but always keep the cached role — the /auth/me
+                // endpoint may return a generic 'user' role even for technicians/admins,
+                // so we trust the role from login and never overwrite it from background refresh.
+                setUser(prev => prev ? { ...prev, ...response.data, role: prev.role } : response.data);
+              }
+            })
+            .catch(() => { /* ignore — cached data is still valid */ });
           return;
         }
         // No cached user — must wait for server
@@ -118,7 +124,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const response = await authService.getMe();
       if (response.success) {
-        setUser(response.data);
+        setUser(prev => prev ? { ...prev, ...response.data, role: prev.role } : response.data);
       }
     } catch (error) {
       console.error('Error refreshing user:', error);
@@ -128,6 +134,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const isAuthenticated = !!user;
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
   const isSuperAdmin = user?.role === 'superadmin';
+  const isTechnician = user?.role === 'technician';
 
   const value: AuthContextType = {
     user,
@@ -140,6 +147,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated,
     isAdmin,
     isSuperAdmin,
+    isTechnician,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

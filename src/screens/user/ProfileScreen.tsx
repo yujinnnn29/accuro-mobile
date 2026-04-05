@@ -9,9 +9,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { launchImageLibrary } from 'react-native-image-picker';
 import {
   ArrowLeft,
@@ -33,18 +34,23 @@ import { Button, Input, Card, Badge } from '../../components/common';
 
 export const ProfileScreen: React.FC = () => {
   const navigation = useNavigation();
+  const route = useRoute();
+  const isTabScreen = route.name === 'TechnicianProfileTab';
   const { user, updateUser, refreshUser, logout } = useAuth();
-  const { theme } = useTheme();
+  const { theme, isDark, toggleTheme } = useTheme();
 
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
 
   const [formData, setFormData] = useState({
-    name: user?.name || '',
+    firstName: user?.firstName || '',
+    middleName: user?.middleName || '',
+    lastName: user?.lastName || '',
     email: user?.email || '',
     phone: user?.phone || '',
     company: user?.company || '',
+    specialization: user?.specialization || '',
   });
 
   const [passwordData, setPasswordData] = useState({
@@ -114,14 +120,11 @@ export const ProfileScreen: React.FC = () => {
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = 'Name is required';
+    if (!formData.firstName.trim()) {
+      newErrors.firstName = 'First name is required';
     }
-
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Invalid email format';
+    if (!formData.lastName.trim()) {
+      newErrors.lastName = 'Last name is required';
     }
 
     setErrors(newErrors);
@@ -154,16 +157,27 @@ export const ProfileScreen: React.FC = () => {
 
     setLoading(true);
     try {
+      const fullName = [formData.firstName.trim(), formData.middleName.trim(), formData.lastName.trim()]
+        .filter(Boolean).join(' ');
+
       await authService.updateDetails({
-        name: formData.name,
+        firstName: formData.firstName.trim(),
+        middleName: formData.middleName.trim() || undefined,
+        lastName: formData.lastName.trim(),
+        name: fullName,
         phone: formData.phone,
         company: formData.company,
+        specialization: formData.specialization || undefined,
       });
 
       updateUser({
-        name: formData.name,
+        firstName: formData.firstName.trim(),
+        middleName: formData.middleName.trim() || undefined,
+        lastName: formData.lastName.trim(),
+        name: fullName,
         phone: formData.phone,
         company: formData.company,
+        specialization: formData.specialization || undefined,
       });
 
       setIsEditing(false);
@@ -197,10 +211,13 @@ export const ProfileScreen: React.FC = () => {
 
   const handleCancel = () => {
     setFormData({
-      name: user?.name || '',
+      firstName: user?.firstName || '',
+      middleName: user?.middleName || '',
+      lastName: user?.lastName || '',
       email: user?.email || '',
       phone: user?.phone || '',
       company: user?.company || '',
+      specialization: user?.specialization || '',
     });
     setErrors({});
     setIsEditing(false);
@@ -214,12 +231,13 @@ export const ProfileScreen: React.FC = () => {
       >
         {/* Header */}
         <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-          >
-            <ArrowLeft size={24} color={theme.text} />
-          </TouchableOpacity>
+          {!isTabScreen ? (
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+              <ArrowLeft size={24} color={theme.text} />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.backButton} />
+          )}
           <Text style={[styles.headerTitle, { color: theme.text }]}>Profile</Text>
           <View style={styles.headerRight} />
         </View>
@@ -247,7 +265,11 @@ export const ProfileScreen: React.FC = () => {
                 <Camera size={18} color={colors.white} />
               </View>
             </TouchableOpacity>
-            <Text style={[styles.userName, { color: theme.text }]}>{user?.name}</Text>
+            <Text style={[styles.userName, { color: theme.text }]}>
+              {user?.firstName && user?.lastName
+                ? `${user.firstName}${user.middleName ? ' ' + user.middleName : ''} ${user.lastName}`
+                : user?.name}
+            </Text>
             <View style={styles.verificationBadge}>
               {user?.isEmailVerified ? (
                 <>
@@ -262,9 +284,13 @@ export const ProfileScreen: React.FC = () => {
               )}
             </View>
             <Badge
-              label={user?.role === 'superadmin' ? 'Super Admin' : user?.role === 'admin' ? 'Admin' : 'User'}
-              variant={user?.role === 'user' ? 'primary' : 'info'}
+              label={user?.role === 'superadmin' ? 'Super Admin' : user?.role === 'admin' ? 'Admin' : user?.role === 'technician' ? 'Technician' : 'User'}
+              variant={user?.role === 'user' ? 'primary' : user?.role === 'technician' ? 'warning' : 'info'}
+              style={{ alignSelf: 'center' }}
             />
+            {user?.technicianNumber ? (
+              <Text style={styles.technicianNumber}>Technician #{user.technicianNumber}</Text>
+            ) : null}
           </View>
 
           {/* Profile Form */}
@@ -279,12 +305,34 @@ export const ProfileScreen: React.FC = () => {
             </View>
 
             <Input
-              label="Full Name"
-              value={formData.name}
-              onChangeText={(value) => handleInputChange('name', value)}
+              label="First Name"
+              value={formData.firstName}
+              onChangeText={(value) => handleInputChange('firstName', value)}
               leftIcon={<User size={18} color={colors.gray[400]} />}
-              error={errors.name}
+              error={errors.firstName}
               editable={isEditing}
+              placeholder="Enter first name"
+            />
+
+            <Input
+              label="Middle Name"
+              value={formData.middleName}
+              onChangeText={(value) => handleInputChange('middleName', value)}
+              leftIcon={<User size={18} color={colors.gray[400]} />}
+              editable={isEditing}
+              containerStyle={styles.inputSpacing}
+              placeholder="Enter middle name (optional)"
+            />
+
+            <Input
+              label="Last Name"
+              value={formData.lastName}
+              onChangeText={(value) => handleInputChange('lastName', value)}
+              leftIcon={<User size={18} color={colors.gray[400]} />}
+              error={errors.lastName}
+              editable={isEditing}
+              containerStyle={styles.inputSpacing}
+              placeholder="Enter last name"
             />
 
             <Input
@@ -296,13 +344,14 @@ export const ProfileScreen: React.FC = () => {
             />
 
             <Input
-              label="Phone"
+              label="Phone Number"
               value={formData.phone}
               onChangeText={(value) => handleInputChange('phone', value)}
               leftIcon={<Phone size={18} color={colors.gray[400]} />}
               keyboardType="phone-pad"
               editable={isEditing}
               containerStyle={styles.inputSpacing}
+              placeholder="Enter phone number"
             />
 
             <Input
@@ -312,7 +361,20 @@ export const ProfileScreen: React.FC = () => {
               leftIcon={<Building2 size={18} color={colors.gray[400]} />}
               editable={isEditing}
               containerStyle={styles.inputSpacing}
+              placeholder="Enter company name"
             />
+
+            {(user?.role === 'technician') && (
+              <Input
+                label="Specialization"
+                value={formData.specialization}
+                onChangeText={(value) => handleInputChange('specialization', value)}
+                leftIcon={<CheckCircle size={18} color={colors.gray[400]} />}
+                editable={isEditing}
+                containerStyle={styles.inputSpacing}
+                placeholder="e.g. HVAC, Electrical, Plumbing"
+              />
+            )}
 
             {isEditing && (
               <View style={styles.buttonRow}>
@@ -330,6 +392,22 @@ export const ProfileScreen: React.FC = () => {
                 />
               </View>
             )}
+          </Card>
+
+          {/* Appearance */}
+          <Card style={styles.formCard} padding="lg">
+            <View style={[styles.formHeader, { marginBottom: 0 }]}>
+              <Text style={[styles.formTitle, { color: theme.text }]}>Appearance</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 16 }}>
+              <Text style={{ color: theme.text, fontSize: 15 }}>Dark Mode</Text>
+              <Switch
+                value={isDark}
+                onValueChange={toggleTheme}
+                trackColor={{ false: colors.gray[300], true: colors.primary[500] }}
+                thumbColor="#fff"
+              />
+            </View>
           </Card>
 
           {/* Change Password */}
@@ -507,6 +585,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.warning,
     fontWeight: '500',
+  },
+  technicianNumber: {
+    fontSize: 13,
+    color: colors.gray[500],
+    fontWeight: '500',
+    marginTop: 6,
   },
   formCard: {
     margin: 16,

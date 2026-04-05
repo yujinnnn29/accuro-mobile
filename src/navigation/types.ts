@@ -6,9 +6,10 @@ export type RootStackParamList = {
   Main: NavigatorScreenParams<RootMainParamList>;
 };
 
-// Root Main Stack (contains User Tabs and Admin Panel)
+// Root Main Stack (contains User Tabs, Technician Panel and Admin Panel)
 export type RootMainParamList = {
   UserTabs: NavigatorScreenParams<MainTabParamList>;
+  TechnicianPanel: NavigatorScreenParams<TechnicianStackParamList>;
   AdminPanel: undefined;
 };
 
@@ -55,15 +56,30 @@ export type CartStackParamList = {
 // More Stack (Profile, Settings, etc.)
 export type MoreStackParamList = {
   MoreMenu: undefined;
+  UserDashboard: undefined;
   Profile: undefined;
   MyQuotations: undefined;
-  QuotationDetail: { quotationId: string };
+  QuotationDetail: { quotationId: string; quotation?: any };
   Testimonials: undefined;
   Contact: undefined;
   About: undefined;
   Settings: undefined;
   AccountHistory: undefined;
   RequestQuote: { fromCart?: boolean } | undefined;
+};
+
+// Technician Tab Navigator
+export type TechnicianTabParamList = {
+  TechnicianDashboardTab: undefined;
+  TechnicianAssignmentsTab: { submitBookingId?: string } | undefined;
+  TechnicianProfileTab: undefined;
+};
+
+// Technician Stack (kept for type compat with RootMainParamList)
+export type TechnicianStackParamList = {
+  TechnicianDashboard: undefined;
+  TechnicianAssignments: { submitBookingId?: string } | undefined;
+  TechnicianProfile: undefined;
 };
 
 // Admin Navigator

@@ -1,4 +1,15 @@
-export type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'rescheduled' | 'pending_review';
+export type BookingStatus = 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled' | 'rescheduled' | 'pending_review';
+
+export interface AssignedTechnician {
+  _id: string;
+  name: string;
+  firstName?: string;
+  lastName?: string;
+  email: string;
+  phone?: string;
+  technicianNumber?: number;
+  specialization?: string;
+}
 
 export interface BookingData {
   date: string;
@@ -22,6 +33,8 @@ export interface Booking extends BookingData {
   originalDate?: string;
   originalTime?: string;
   isCompleted?: boolean;
+  assignedTechnician?: AssignedTechnician | string;
+  assignedAt?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -21,6 +21,7 @@ import {
   LayoutDashboard,
   Activity,
   Moon,
+  House,
 } from 'lucide-react-native';
 import { useAuth, useTheme } from '../../contexts';
 import { colors } from '../../theme';
@@ -53,6 +54,12 @@ export const MoreMenuScreen: React.FC = () => {
   };
 
   const menuItems: MenuItem[] = [
+    {
+      icon: House,
+      label: 'My Dashboard',
+      description: 'Bookings, quotes, activity & more',
+      screen: 'UserDashboard',
+    },
     {
       icon: User,
       label: 'My Profile',

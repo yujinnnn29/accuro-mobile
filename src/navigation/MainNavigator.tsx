@@ -3,9 +3,9 @@ import { View, Text, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { CommonActions } from '@react-navigation/native';
-import { Home, Calendar, ClipboardList, Bell, Menu } from 'lucide-react-native';
+import { Home, Calendar, ClipboardList, Bell, Menu, Briefcase, LayoutDashboard, User } from 'lucide-react-native';
 import { colors } from '../theme';
-import { useNotifications } from '../contexts';
+import { useNotifications, useAuth } from '../contexts';
 import {
   MainTabParamList,
   HomeStackParamList,
@@ -13,6 +13,8 @@ import {
   CartStackParamList,
   MoreStackParamList,
   RootMainParamList,
+  TechnicianStackParamList,
+  TechnicianTabParamList,
 } from './types';
 
 // Import screens
@@ -34,7 +36,60 @@ import AccountHistoryScreen from '../screens/user/AccountHistoryScreen';
 // Admin Navigator
 import AdminNavigator from './AdminNavigator';
 
+// Technician screens
+import TechnicianDashboardScreen from '../screens/technician/TechnicianDashboardScreen';
+import TechnicianAssignmentsScreen from '../screens/technician/TechnicianAssignmentsScreen';
+
 const RootStack = createNativeStackNavigator<RootMainParamList>();
+const TechnicianTab = createBottomTabNavigator<TechnicianTabParamList>();
+
+// Technician Navigator (bottom tabs)
+const TechnicianNavigator: React.FC = () => (
+  <TechnicianTab.Navigator
+    screenOptions={({ route }) => ({
+      headerShown: false,
+      tabBarActiveTintColor: colors.primary[600],
+      tabBarInactiveTintColor: colors.gray[400],
+      tabBarStyle: {
+        backgroundColor: colors.white,
+        borderTopColor: colors.gray[200],
+        paddingBottom: 5,
+        paddingTop: 5,
+        height: 60,
+      },
+      tabBarLabelStyle: { fontSize: 12, fontWeight: '500' },
+      tabBarIcon: ({ focused, color, size }) => {
+        const s = size || 24;
+        switch (route.name) {
+          case 'TechnicianDashboardTab':
+            return <LayoutDashboard size={s} color={color} />;
+          case 'TechnicianAssignmentsTab':
+            return <ClipboardList size={s} color={color} />;
+          case 'TechnicianProfileTab':
+            return <User size={s} color={color} />;
+          default:
+            return <LayoutDashboard size={s} color={color} />;
+        }
+      },
+    })}
+  >
+    <TechnicianTab.Screen
+      name="TechnicianDashboardTab"
+      component={TechnicianDashboardScreen}
+      options={{ tabBarLabel: 'Dashboard' }}
+    />
+    <TechnicianTab.Screen
+      name="TechnicianAssignmentsTab"
+      component={TechnicianAssignmentsScreen}
+      options={{ tabBarLabel: 'Assignments' }}
+    />
+    <TechnicianTab.Screen
+      name="TechnicianProfileTab"
+      component={ProfileScreen}
+      options={{ tabBarLabel: 'Profile' }}
+    />
+  </TechnicianTab.Navigator>
+);
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
 const BookingsStack = createNativeStackNavigator<BookingsStackParamList>();
@@ -79,6 +134,7 @@ const MoreStackNavigator: React.FC = () => {
   return (
     <MoreStack.Navigator screenOptions={{ headerShown: false }}>
       <MoreStack.Screen name="MoreMenu" component={MoreMenuScreen} />
+      <MoreStack.Screen name="UserDashboard" component={UserDashboardScreen} />
       <MoreStack.Screen name="Profile" component={ProfileScreen} />
       <MoreStack.Screen name="MyQuotations" component={MyQuotationsScreen} />
       <MoreStack.Screen name="QuotationDetail" component={QuotationDetailScreen} />
@@ -179,18 +235,25 @@ const UserTabNavigator: React.FC = () => {
   );
 };
 
-// Main Navigator - Always shows User interface first, Admin can access admin panel via menu
+// Main Navigator - Routes to User, Technician, or Admin based on role
 export const MainNavigator: React.FC = () => {
+  const { isTechnician, isAdmin } = useAuth();
+
   return (
     <RootStack.Navigator screenOptions={{ headerShown: false }}>
-      <RootStack.Screen name="UserTabs" component={UserTabNavigator} />
-      <RootStack.Screen
-        name="AdminPanel"
-        component={AdminNavigator}
-        options={{
-          animation: 'slide_from_right',
-        }}
-      />
+      {isTechnician ? (
+        <RootStack.Screen name="TechnicianPanel" component={TechnicianNavigator} />
+      ) : (
+        <RootStack.Screen name="UserTabs" component={UserTabNavigator} />
+      )}
+      <RootStack.Screen name="AdminPanel" component={AdminNavigator} options={{ animation: 'slide_from_right' }} />
+      {/* Also register both so navigation between them works */}
+      {!isTechnician && (
+        <RootStack.Screen name="TechnicianPanel" component={TechnicianNavigator} />
+      )}
+      {isTechnician && (
+        <RootStack.Screen name="UserTabs" component={UserTabNavigator} />
+      )}
     </RootStack.Navigator>
   );
 };
