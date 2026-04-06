@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Switch } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList, DrawerContentComponentProps } from '@react-navigation/drawer';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
@@ -36,6 +37,7 @@ const CustomDrawerContent: React.FC<DrawerContentComponentProps> = (props) => {
   const { user, logout } = useAuth();
   const { isDark, toggleTheme, theme } = useTheme();
   const { navigation } = props;
+  const insets = useSafeAreaInsets();
 
   const handleBackToWebsite = () => {
     // Navigate back to user tabs using the parent navigator (RootStack)
@@ -119,7 +121,7 @@ const CustomDrawerContent: React.FC<DrawerContentComponentProps> = (props) => {
       </View>
 
       {/* Bottom actions: Back to Website + Logout */}
-      <View style={[styles.backSection, { backgroundColor: theme.surface, borderTopColor: theme.border }]}>
+      <View style={[styles.backSection, { backgroundColor: theme.surface, borderTopColor: theme.border, paddingBottom: insets.bottom + 12 }]}>
         <TouchableOpacity style={[styles.backButton, { backgroundColor: isDark ? theme.border : colors.primary[50] }]} onPress={handleBackToWebsite}>
           <Home size={20} color={colors.primary[600]} />
           <Text style={styles.backText}>Back to Website</Text>
