@@ -61,19 +61,17 @@ export const AdminDashboardScreen: React.FC = () => {
   const fetchDashboardData = useCallback(async () => {
     try {
       const now = new Date();
-      const today = now.toISOString().split('T')[0];
-      // Use full day range so $gte/$lte in MongoDB covers the whole day
-      const todayStart = `${today}T00:00:00.000Z`;
-      const todayEnd = `${today}T23:59:59.999Z`;
+      const today = now.toISOString().split('T')[0]; // "YYYY-MM-DD"
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      const monthEnd = `${new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]}T23:59:59.999Z`;
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
 
-      // Use xhr adapter for all calls to avoid Axios fetch-adapter silent failure bug
-      const [analyticsRes, quotationsRes, todayRes, completedMonthRes] = await Promise.all([
+      // Fetch all bookings + quotations + analytics in parallel
+      // (website counts today's bookings client-side from full list)
+      const [analyticsRes, quotationsRes, allBookingsRes, completedMonthRes] = await Promise.all([
         api.get('/analytics/dashboard', { adapter: 'xhr' }).catch(() => ({ data: null })),
         api.get('/quotations', { params: { status: 'pending' }, adapter: 'xhr' }).catch(() => ({ data: null })),
-        api.get('/bookings', { params: { startDate: todayStart, endDate: todayEnd }, adapter: 'xhr' }).catch(() => ({ data: null })),
-        api.get('/bookings', { params: { startDate: `${monthStart}T00:00:00.000Z`, endDate: monthEnd, status: 'completed' }, adapter: 'xhr' }).catch(() => ({ data: null })),
+        api.get('/bookings', { adapter: 'xhr' }).catch(() => ({ data: null })),
+        api.get('/bookings', { params: { startDate: monthStart, endDate: monthEnd, status: 'completed' }, adapter: 'xhr' }).catch(() => ({ data: null })),
       ]);
 
       // Analytics response for pending count
@@ -84,10 +82,16 @@ export const AdminDashboardScreen: React.FC = () => {
 
       const pendingBookingCount = getStatusCount('pending');
 
-      // Today's bookings count
-      const todayCount = todayRes.data?.count ?? todayRes.data?.data?.length ?? 0;
+      // Count today's bookings client-side (same as website)
+      const allBookings: any[] = allBookingsRes.data?.data ?? allBookingsRes.data ?? [];
+      const todayCount = Array.isArray(allBookings)
+        ? allBookings.filter((b: any) => {
+            const d = b.date ? (b.date as string).split('T')[0] : '';
+            return d === today;
+          }).length
+        : 0;
 
-      // Completed this month (current month only)
+      // Completed this month
       const completedThisMonth = completedMonthRes.data?.count ?? completedMonthRes.data?.data?.length ?? 0;
 
       setStats({
@@ -97,22 +101,20 @@ export const AdminDashboardScreen: React.FC = () => {
         completedThisMonth,
       });
 
-      // Pending quotations count from quotations endpoint
+      // Pending quotations count
       const quotationsData = quotationsRes.data?.data ?? quotationsRes.data ?? [];
       const pendingQuoteCount = Array.isArray(quotationsData) ? quotationsData.length : (quotationsRes.data?.count ?? 0);
-      const pendingReviewCount = 0; // reviews endpoint not available
       setPendingQuotations(pendingQuoteCount);
-      setPendingReviews(pendingReviewCount);
+      setPendingReviews(0);
 
-      // Today's schedule — use same full-day range
+      // Today's schedule — filter from the full bookings list already fetched
       let todayData: any[] = [];
-      try {
-        const schedRes = await api.get('/bookings', {
-          params: { startDate: todayStart, endDate: todayEnd },
-          adapter: 'xhr',
+      if (Array.isArray(allBookings)) {
+        todayData = allBookings.filter((b: any) => {
+          const d = b.date ? (b.date as string).split('T')[0] : '';
+          return d === today;
         });
-        todayData = schedRes.data?.data || [];
-      } catch { /* leave empty */ }
+      }
       setTodaySchedule(
         todayData.map((item: any) => ({
           _id: item._id || item.id,

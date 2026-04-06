@@ -100,28 +100,8 @@ const CustomDrawerContent: React.FC<DrawerContentComponentProps> = (props) => {
         />
       </View>
 
-      {/* Admin Info Card */}
-      <View style={[
-        styles.infoCard,
-        {
-          backgroundColor: isDark ? theme.surface : colors.primary[50],
-          borderColor: isDark ? theme.border : colors.primary[100],
-        },
-      ]}>
-        <View style={[styles.infoCardIcon, { backgroundColor: isDark ? theme.border : colors.primary[100] }]}>
-          <Shield size={18} color={colors.primary[600]} />
-        </View>
-        <View style={styles.infoCardContent}>
-          <Text style={[styles.infoCardTitle, { color: isDark ? colors.primary[300] : colors.primary[700] }]}>Admin Panel</Text>
-          <Text style={[styles.infoCardSub, { color: isDark ? colors.primary[400] : colors.primary[500] }]}>Accuro Mobile v1.0</Text>
-          <Text style={[styles.infoCardDate, { color: theme.textSecondary }]}>
-            {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-          </Text>
-        </View>
-      </View>
-
       {/* Bottom actions: Back to Website + Logout */}
-      <View style={[styles.backSection, { backgroundColor: theme.surface, borderTopColor: theme.border, paddingBottom: insets.bottom + 12 }]}>
+      <View style={[styles.backSection, { backgroundColor: theme.surface, borderTopColor: theme.border, paddingBottom: Math.max(insets.bottom, 8) }]}>
         <TouchableOpacity style={[styles.backButton, { backgroundColor: isDark ? theme.border : colors.primary[50] }]} onPress={handleBackToWebsite}>
           <Home size={20} color={colors.primary[600]} />
           <Text style={styles.backText}>Back to Website</Text>
