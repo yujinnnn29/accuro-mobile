@@ -142,8 +142,10 @@ export const QuotationDetailScreen: React.FC = () => {
   };
 
   const statusStyle = STATUS_STYLES[quotation.status] || STATUS_STYLES.pending;
-  const isApproved = quotation.status === 'approved' || quotation.status === 'accepted';
+  const isAccepted = quotation.status === 'accepted' || quotation.status === 'approved';
   const isQuoted = quotation.status === 'quoted';
+  const isDeclined = quotation.status === 'declined';
+  const isRejected = quotation.status === 'rejected';
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
@@ -211,40 +213,40 @@ export const QuotationDetailScreen: React.FC = () => {
 
         {/* Quote Sent — Accept/Decline Actions */}
         {isQuoted && (
-          <View style={styles.approvedCard}>
-            <Text style={styles.approvedTitle}>Quote Ready for Review</Text>
+          <View style={styles.quotedCard}>
+            <Text style={styles.quotedTitle}>Quote Prepared — Your Action Needed</Text>
 
             {quotation.totalAmount != null && (
               <>
-                <Text style={styles.totalLabel}>Total Amount:</Text>
-                <Text style={styles.totalAmount}>
+                <Text style={styles.quotedTotalLabel}>Total Amount:</Text>
+                <Text style={styles.quotedTotalAmount}>
                   {formatCurrency(quotation.totalAmount, quotation.currency)}
                 </Text>
               </>
             )}
 
             {quotation.validUntil && (
-              <Text style={styles.validUntil}>Valid until: {formatDate(quotation.validUntil)}</Text>
+              <Text style={styles.quotedValidUntil}>Valid until: {formatDate(quotation.validUntil)}</Text>
             )}
 
             {quotation.paymentTerms && (
               <View style={styles.termRow}>
-                <Text style={styles.termLabel}>Payment Terms:</Text>
-                <Text style={styles.termValue}>{quotation.paymentTerms}</Text>
+                <Text style={styles.quotedTermLabel}>Payment Terms:</Text>
+                <Text style={styles.quotedTermValue}>{quotation.paymentTerms}</Text>
               </View>
             )}
 
             {quotation.deliveryTerms && (
               <View style={styles.termRow}>
-                <Text style={styles.termLabel}>Delivery Terms:</Text>
-                <Text style={styles.termValue}>{quotation.deliveryTerms}</Text>
+                <Text style={styles.quotedTermLabel}>Delivery Terms:</Text>
+                <Text style={styles.quotedTermValue}>{quotation.deliveryTerms}</Text>
               </View>
             )}
 
             {(quotation.termsAndConditions || quotation.terms) && (
               <View style={styles.termRow}>
-                <Text style={styles.termLabel}>Terms & Conditions:</Text>
-                <Text style={styles.termValue}>{quotation.termsAndConditions || quotation.terms}</Text>
+                <Text style={styles.quotedTermLabel}>Terms & Conditions:</Text>
+                <Text style={styles.quotedTermValue}>{quotation.termsAndConditions || quotation.terms}</Text>
               </View>
             )}
 
@@ -271,10 +273,10 @@ export const QuotationDetailScreen: React.FC = () => {
           </View>
         )}
 
-        {/* Approved Quotation Details */}
-        {isApproved && (
+        {/* Accepted Quotation Details */}
+        {isAccepted && (
           <View style={styles.approvedCard}>
-            <Text style={styles.approvedTitle}>Approved Quotation</Text>
+            <Text style={styles.approvedTitle}>Quotation Accepted</Text>
 
             {quotation.totalAmount != null && (
               <>
@@ -312,6 +314,37 @@ export const QuotationDetailScreen: React.FC = () => {
           </View>
         )}
 
+        {/* Declined by user */}
+        {isDeclined && (
+          <View style={styles.declinedCard}>
+            <Text style={styles.declinedTitle}>You Declined This Quotation</Text>
+            {quotation.totalAmount != null && (
+              <Text style={styles.declinedAmount}>
+                {formatCurrency(quotation.totalAmount, quotation.currency)}
+              </Text>
+            )}
+            {(quotation as any).declinedAt && (
+              <Text style={styles.declinedDate}>
+                Declined on: {formatDate((quotation as any).declinedAt)}
+              </Text>
+            )}
+            {(quotation as any).declineReason && (
+              <View style={styles.termRow}>
+                <Text style={styles.declinedLabel}>Reason:</Text>
+                <Text style={styles.declinedValue}>{(quotation as any).declineReason}</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Rejected by admin */}
+        {isRejected && quotation.adminNotes && (
+          <View style={styles.rejectedCard}>
+            <Text style={styles.rejectedTitle}>Quotation Rejected by Admin</Text>
+            <Text style={styles.rejectedNote}>{quotation.adminNotes}</Text>
+          </View>
+        )}
+
         {/* Additional Requirements */}
         {quotation.additionalRequirements ? (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
@@ -320,8 +353,8 @@ export const QuotationDetailScreen: React.FC = () => {
           </View>
         ) : null}
 
-        {/* Admin Notes */}
-        {quotation.adminNotes ? (
+        {/* Admin Notes (for non-rejected statuses) */}
+        {quotation.adminNotes && !isRejected ? (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>Response from Accuro</Text>
             <Text style={[styles.noteText, { color: theme.textSecondary }]}>{quotation.adminNotes}</Text>
@@ -421,7 +454,36 @@ const styles = StyleSheet.create({
   itemQty: { fontSize: 13 },
   itemSpec: { fontSize: 13, marginTop: 4, fontStyle: 'italic' },
 
-  // Approved card
+  // Quoted card (blue — action needed)
+  quotedCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#93C5FD',
+    backgroundColor: '#EFF6FF',
+    padding: 16,
+  },
+  quotedTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1e40af',
+    marginBottom: 12,
+  },
+  quotedTotalLabel: { fontSize: 13, color: '#1e40af' },
+  quotedTotalAmount: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#2563EB',
+    marginBottom: 8,
+  },
+  quotedValidUntil: {
+    fontSize: 13,
+    color: '#1e40af',
+    marginBottom: 12,
+  },
+  quotedTermLabel: { fontSize: 13, fontWeight: '600', color: '#1e40af', marginBottom: 2 },
+  quotedTermValue: { fontSize: 13, color: '#1d4ed8' },
+
+  // Accepted card (green)
   approvedCard: {
     borderRadius: 12,
     borderWidth: 1,
@@ -450,6 +512,55 @@ const styles = StyleSheet.create({
   termRow: { marginTop: 10 },
   termLabel: { fontSize: 13, fontWeight: '600', color: '#065F46', marginBottom: 2 },
   termValue: { fontSize: 13, color: '#047857' },
+
+  // Declined card (orange)
+  declinedCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+    backgroundColor: '#FFF7ED',
+    padding: 16,
+  },
+  declinedTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#9A3412',
+    marginBottom: 8,
+  },
+  declinedAmount: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#EA580C',
+    textDecorationLine: 'line-through',
+    marginBottom: 4,
+  },
+  declinedDate: {
+    fontSize: 13,
+    color: '#C2410C',
+    marginBottom: 4,
+  },
+  declinedLabel: { fontSize: 13, fontWeight: '600', color: '#9A3412', marginBottom: 2 },
+  declinedValue: { fontSize: 13, color: '#C2410C' },
+
+  // Rejected card (red)
+  rejectedCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    backgroundColor: '#FEF2F2',
+    padding: 16,
+  },
+  rejectedTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#991B1B',
+    marginBottom: 8,
+  },
+  rejectedNote: {
+    fontSize: 14,
+    color: '#B91C1C',
+    lineHeight: 22,
+  },
 
   // Notes
   noteText: { fontSize: 14, lineHeight: 22 },

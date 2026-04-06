@@ -7,6 +7,7 @@ interface FilterOption {
   key: string;
   label: string;
   count?: number;
+  highlight?: boolean; // shows count badge in red (for action-needed tabs)
 }
 
 interface FilterTabsProps {
@@ -53,6 +54,7 @@ export const FilterTabs: React.FC<FilterTabsProps> = ({
                   styles.countBadge,
                   { backgroundColor: isDark ? theme.border : colors.gray[200] },
                   isSelected && styles.countBadgeSelected,
+                  !isSelected && option.highlight && option.count > 0 && styles.countBadgeHighlight,
                 ]}
               >
                 <Text
@@ -60,6 +62,7 @@ export const FilterTabs: React.FC<FilterTabsProps> = ({
                     styles.countText,
                     { color: theme.textSecondary },
                     isSelected && styles.countTextSelected,
+                    !isSelected && option.highlight && option.count > 0 && styles.countTextHighlight,
                   ]}
                 >
                   {option.count}
@@ -138,6 +141,12 @@ const styles = StyleSheet.create({
   },
   countTextSelected: {
     color: colors.white,
+  },
+  countBadgeHighlight: {
+    backgroundColor: '#FEE2E2',
+  },
+  countTextHighlight: {
+    color: '#DC2626',
   },
 });
 

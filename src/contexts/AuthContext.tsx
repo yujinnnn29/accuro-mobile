@@ -64,9 +64,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       } else {
         // No stored token — fire warmup after UI is interactive so it doesn't block startup
-        InteractionManager.runAfterInteractions(() => {
-          authService.warmup();
-        });
+        authService.warmup();
       }
     } catch (error: any) {
       // Only clear stored credentials on auth failures (401), not network/abort errors

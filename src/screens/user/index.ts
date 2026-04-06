@@ -1,4 +1,4 @@
-export { default as UserDashboardScreen } from './UserDashboardScreen';
+export { UserDashboardScreen } from './UserDashboardScreen';
 export { default as ProfileScreen } from './ProfileScreen';
 export { default as MyBookingsScreen } from './MyBookingsScreen';
 export { default as BookingDetailScreen } from './BookingDetailScreen';

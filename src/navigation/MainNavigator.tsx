@@ -19,7 +19,7 @@ import {
 
 // Import screens
 import { HomeScreen, ProductsScreen, ProductDetailScreen, BookingScreen, RequestQuoteScreen } from '../screens/public';
-import UserDashboardScreen from '../screens/user/UserDashboardScreen';
+import { UserDashboardScreen } from '../screens/user/UserDashboardScreen';
 import MyBookingsScreen from '../screens/user/MyBookingsScreen';
 import BookingDetailScreen from '../screens/user/BookingDetailScreen';
 import CartScreen from '../screens/user/CartScreen';
