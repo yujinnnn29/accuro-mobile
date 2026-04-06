@@ -81,7 +81,11 @@ export const AdminQuotationsScreen: React.FC = () => {
   const fetchQuotations = useCallback(async () => {
     try {
       const response = await quotationService.getAllQuotations();
-      setQuotations(response.data || []);
+      const items = (response.data || []).map((q: any) => ({
+        ...q,
+        _id: q._id || q.id,
+      }));
+      setQuotations(items);
     } catch (error: any) {
       const isNetworkIssue = !error.response && (error.name === 'AbortError' || error.code === 'ERR_CANCELED' || error.code === 'ERR_NETWORK' || error.message === 'Aborted' || error.message === 'Network Error');
       if (!isNetworkIssue) console.error('Error fetching quotations:', error);
@@ -103,6 +107,7 @@ export const AdminQuotationsScreen: React.FC = () => {
       return;
     }
     setActionLoading(sendQuoteModal._id);
+    console.log('[SendQuote] id=', sendQuoteModal._id, 'quotationNumber=', sendQuoteModal.quotationNumber);
     try {
       const validUntil = new Date();
       validUntil.setDate(validUntil.getDate() + parseInt(quoteData.validDays, 10));
@@ -115,6 +120,7 @@ export const AdminQuotationsScreen: React.FC = () => {
       try {
         await quotationService.sendQuote(sendQuoteModal._id, payload);
       } catch (firstErr: any) {
+        console.log('[SendQuote] /quote failed status=', firstErr.response?.status, firstErr.message);
         if (firstErr.response?.status === 404) {
           await quotationService.approveQuotation(sendQuoteModal._id, payload);
         } else {
