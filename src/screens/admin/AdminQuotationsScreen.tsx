@@ -312,16 +312,16 @@ export const AdminQuotationsScreen: React.FC = () => {
 
               {/* Info card */}
               <View style={[styles.detailCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-                <DetailRow label="Requested On" value={formatDate(detailModal.createdAt)} />
-                {detailModal.validUntil && <DetailRow label="Valid Until" value={formatDate(detailModal.validUntil)} />}
-                {detailModal.customerName && <DetailRow label="Customer" value={detailModal.customerName} />}
-                {detailModal.customerEmail && <DetailRow label="Email" value={detailModal.customerEmail} />}
-                {detailModal.company && <DetailRow label="Company" value={detailModal.company} />}
-                {detailModal.totalAmount != null && (
-                  <DetailRow label="Total Amount" value={formatCurrency(detailModal.totalAmount) || ''} highlight />
-                )}
-                {detailModal.paymentTerms && <DetailRow label="Payment Terms" value={detailModal.paymentTerms} />}
-                {detailModal.deliveryTerms && <DetailRow label="Delivery Terms" value={detailModal.deliveryTerms} last />}
+                <DetailRow label="Requested On" value={formatDate(detailModal.createdAt)} borderColor={theme.border} textColor={theme.text} />
+                {detailModal.validUntil ? <DetailRow label="Valid Until" value={formatDate(detailModal.validUntil)} borderColor={theme.border} textColor={theme.text} /> : null}
+                {detailModal.customerName ? <DetailRow label="Customer" value={detailModal.customerName} borderColor={theme.border} textColor={theme.text} /> : null}
+                {detailModal.customerEmail ? <DetailRow label="Email" value={detailModal.customerEmail} borderColor={theme.border} textColor={theme.text} /> : null}
+                {detailModal.company ? <DetailRow label="Company" value={detailModal.company} borderColor={theme.border} textColor={theme.text} /> : null}
+                {detailModal.totalAmount != null ? (
+                  <DetailRow label="Total Amount" value={formatCurrency(detailModal.totalAmount) || ''} highlight borderColor={theme.border} textColor={theme.text} />
+                ) : null}
+                {detailModal.paymentTerms ? <DetailRow label="Payment Terms" value={detailModal.paymentTerms} borderColor={theme.border} textColor={theme.text} /> : null}
+                {detailModal.deliveryTerms ? <DetailRow label="Delivery Terms" value={detailModal.deliveryTerms} last borderColor={theme.border} textColor={theme.text} /> : null}
               </View>
 
               {/* Items */}
@@ -520,23 +520,19 @@ export const AdminQuotationsScreen: React.FC = () => {
   );
 };
 
-/* ─── Small helper components ─── */
-const DetailRow: React.FC<{ label: string; value: string; last?: boolean; highlight?: boolean }> = ({ label, value, last, highlight }) => {
-  const { theme } = useTheme();
-  return (
-    <View style={[detailRowStyles.row, !last && { borderBottomWidth: 1, borderBottomColor: theme.border }]}>
-      <Text style={detailRowStyles.label}>{label}</Text>
-      <Text style={[detailRowStyles.value, { color: highlight ? colors.primary[600] : theme.text }, highlight && detailRowStyles.highlight]}>
-        {value}
-      </Text>
-    </View>
-  );
-};
+/* ─── Small helper components (no hooks — safe to use inside Modals) ─── */
+const DetailRow: React.FC<{ label: string; value: string; last?: boolean; highlight?: boolean; borderColor: string; textColor: string }> = ({ label, value, last, highlight, borderColor, textColor }) => (
+  <View style={[detailRowStyles.row, !last && { borderBottomWidth: 1, borderBottomColor: borderColor }]}>
+    <Text style={detailRowStyles.label}>{label}</Text>
+    <Text style={[detailRowStyles.value, { color: highlight ? colors.primary[600] : textColor }, highlight && detailRowStyles.highlight]}>
+      {value}
+    </Text>
+  </View>
+);
 
-const FieldLabel: React.FC<{ label: string }> = ({ label }) => {
-  const { theme } = useTheme();
-  return <Text style={[fieldLabelStyles.label, { color: theme.textSecondary }]}>{label}</Text>;
-};
+const FieldLabel: React.FC<{ label: string }> = ({ label }) => (
+  <Text style={fieldLabelStyles.label}>{label}</Text>
+);
 
 const detailRowStyles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14 },
@@ -546,7 +542,7 @@ const detailRowStyles = StyleSheet.create({
 });
 
 const fieldLabelStyles = StyleSheet.create({
-  label: { fontSize: 13, fontWeight: '600', color: colors.gray[500], marginBottom: 6, marginTop: 14 },
+  label: { fontSize: 13, fontWeight: '600', color: colors.gray[500], marginBottom: 6, marginTop: 14, paddingHorizontal: 2 },
 });
 
 /* ─── Main styles ─── */
