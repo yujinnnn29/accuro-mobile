@@ -385,7 +385,7 @@ export const AdminQuotationsScreen: React.FC = () => {
       </Modal>
 
       {/* ── Send Quote Modal ── */}
-      <Modal visible={!!sendQuoteModal} animationType="slide" transparent onRequestClose={() => setSendQuoteModal(null)}>
+      <Modal visible={!!sendQuoteModal} animationType="none" transparent onRequestClose={() => setSendQuoteModal(null)}>
         <View style={styles.bottomSheetOverlay}>
           <View style={[styles.bottomSheet, { backgroundColor: theme.surface }]}>
             <View style={styles.bottomSheetHandle} />
@@ -399,75 +399,72 @@ export const AdminQuotationsScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <FieldLabel label="Total Amount (PHP) *" />
-              <TextInput
-                style={[styles.fieldInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
-                value={quoteData.totalAmount}
-                onChangeText={(v) => setQuoteData({ ...quoteData, totalAmount: v })}
-                placeholder="e.g. 25000"
-                placeholderTextColor={colors.gray[400]}
-                keyboardType="numeric"
-              />
+            <FieldLabel label="Total Amount (PHP) *" />
+            <TextInput
+              style={[styles.fieldInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
+              value={quoteData.totalAmount}
+              onChangeText={(v) => setQuoteData({ ...quoteData, totalAmount: v })}
+              placeholder="e.g. 25000"
+              placeholderTextColor={colors.gray[400]}
+              keyboardType="numeric"
+            />
 
-              <FieldLabel label="Valid for (days)" />
-              <TextInput
-                style={[styles.fieldInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
-                value={quoteData.validDays}
-                onChangeText={(v) => setQuoteData({ ...quoteData, validDays: v })}
-                keyboardType="numeric"
-                placeholderTextColor={colors.gray[400]}
-              />
+            <FieldLabel label="Valid for (days)" />
+            <TextInput
+              style={[styles.fieldInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
+              value={quoteData.validDays}
+              onChangeText={(v) => setQuoteData({ ...quoteData, validDays: v })}
+              keyboardType="numeric"
+              placeholderTextColor={colors.gray[400]}
+            />
 
-              <FieldLabel label="Terms & Conditions (optional)" />
-              <TextInput
-                style={[styles.fieldInput, styles.fieldTextarea, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
-                value={quoteData.terms}
-                onChangeText={(v) => setQuoteData({ ...quoteData, terms: v })}
-                placeholder="Payment terms, delivery notes..."
-                placeholderTextColor={colors.gray[400]}
-                multiline
-              />
+            <FieldLabel label="Terms & Conditions (optional)" />
+            <TextInput
+              style={[styles.fieldInput, styles.fieldTextarea, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
+              value={quoteData.terms}
+              onChangeText={(v) => setQuoteData({ ...quoteData, terms: v })}
+              placeholder="Payment terms, delivery notes..."
+              placeholderTextColor={colors.gray[400]}
+              multiline
+            />
 
-              <FieldLabel label="Admin Notes (optional)" />
-              <TextInput
-                style={[styles.fieldInput, styles.fieldTextarea, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
-                value={quoteData.adminNotes}
-                onChangeText={(v) => setQuoteData({ ...quoteData, adminNotes: v })}
-                placeholder="Internal notes visible to customer..."
-                placeholderTextColor={colors.gray[400]}
-                multiline
-              />
+            <FieldLabel label="Admin Notes (optional)" />
+            <TextInput
+              style={[styles.fieldInput, styles.fieldTextarea, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
+              value={quoteData.adminNotes}
+              onChangeText={(v) => setQuoteData({ ...quoteData, adminNotes: v })}
+              placeholder="Internal notes visible to customer..."
+              placeholderTextColor={colors.gray[400]}
+              multiline
+            />
 
-              <View style={styles.sheetActions}>
-                <TouchableOpacity
-                  style={[styles.sheetCancelBtn, { borderColor: theme.border }]}
-                  onPress={() => setSendQuoteModal(null)}
-                >
-                  <Text style={[styles.sheetCancelText, { color: theme.text }]}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.sheetConfirmBtn, actionLoading === sendQuoteModal?._id && { opacity: 0.6 }]}
-                  onPress={handleSendQuote}
-                  disabled={!!actionLoading}
-                >
-                  {actionLoading === sendQuoteModal?._id
-                    ? <ActivityIndicator size="small" color="#fff" />
-                    : <>
-                        <Send size={16} color="#fff" />
-                        <Text style={styles.sheetConfirmText}>Send Quote</Text>
-                      </>
-                  }
-                </TouchableOpacity>
-              </View>
-              <View style={{ height: 16 }} />
-            </ScrollView>
+            <View style={styles.sheetActions}>
+              <TouchableOpacity
+                style={[styles.sheetCancelBtn, { borderColor: theme.border }]}
+                onPress={() => setSendQuoteModal(null)}
+              >
+                <Text style={[styles.sheetCancelText, { color: theme.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sheetConfirmBtn, actionLoading === sendQuoteModal?._id && { opacity: 0.6 }]}
+                onPress={handleSendQuote}
+                disabled={!!actionLoading}
+              >
+                {actionLoading === sendQuoteModal?._id
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <>
+                      <Send size={16} color="#fff" />
+                      <Text style={styles.sheetConfirmText}>Send Quote</Text>
+                    </>
+                }
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
 
       {/* ── Reject Modal ── */}
-      <Modal visible={!!rejectModal} animationType="slide" transparent onRequestClose={() => setRejectModal(null)}>
+      <Modal visible={!!rejectModal} animationType="none" transparent onRequestClose={() => setRejectModal(null)}>
         <View style={styles.bottomSheetOverlay}>
           <View style={[styles.bottomSheet, { backgroundColor: theme.surface }]}>
             <View style={styles.bottomSheetHandle} />
