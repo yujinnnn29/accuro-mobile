@@ -162,11 +162,12 @@ export const AdminDashboardScreen: React.FC = () => {
       setRecentActivity(
         activityData.map((item: any) => ({
           _id: item._id || item.id,
-          action: (item.action || item.type || 'update') as any,
+          action: item.action || item.type || 'Activity',
           resource: item.resource || item.title || 'System',
-          resourceType: item.resourceType || item.type || 'booking',
+          resourceType: item.resourceType || item.type || '',
           resourceId: item.resourceId || item._id,
-          description: item.description || item.subtitle || '',
+          description: item.details || item.description || item.subtitle || '',
+          user: item.user || item.performedBy || null,
           timestamp: item.timestamp || item.createdAt || item.date || new Date().toISOString(),
         }))
       );

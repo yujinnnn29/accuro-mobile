@@ -156,10 +156,14 @@ const MyQuotationsScreen: React.FC = () => {
   };
 
   const handleBookMeeting = (quotation: Quotation) => {
-    // Navigate cross-stack to the Booking screen inside HomeTab
+    const productNames = quotation.items.map(i => i.productName).join(', ');
     navigation.getParent()?.navigate('HomeTab' as any, {
       screen: 'Booking',
-      params: { productId: undefined },
+      params: {
+        quotationId: quotation._id,
+        quotationNumber: quotation.quotationNumber,
+        quotationProducts: productNames,
+      },
     });
   };
 

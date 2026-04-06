@@ -100,13 +100,19 @@ export const BookingScreen: React.FC = () => {
     date: string; time: string; purpose: string; location: string; contactName: string;
   } | null>(null);
 
-  // Pre-fill additional notes if coming from cart with quotation request
+  // Pre-fill from params (cart products or accepted quotation)
   useEffect(() => {
-    const params = route.params as { cartProducts?: string } | undefined;
+    const params = route.params as { cartProducts?: string; quotationNumber?: string; quotationProducts?: string; quotationId?: string } | undefined;
     if (params?.cartProducts) {
-      setFormData(function(prev) {
-        return { ...prev, additionalInfo: params.cartProducts || '' };
-      });
+      setFormData(prev => ({ ...prev, additionalInfo: params.cartProducts || '' }));
+    } else if (params?.quotationNumber) {
+      const productInfo = params.quotationProducts || '';
+      const notes = `Reference: Quotation ${params.quotationNumber}${productInfo ? `\nProducts: ${productInfo}` : ''}`;
+      setFormData(prev => ({
+        ...prev,
+        product: productInfo,
+        additionalInfo: notes,
+      }));
     }
   }, [route.params]);
 
