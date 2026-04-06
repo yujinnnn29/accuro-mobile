@@ -97,16 +97,16 @@ export const quotationService = {
     id: string,
     data: { totalAmount: number; validUntil: string; terms?: string; adminNotes?: string }
   ): Promise<QuotationResponse> => {
-    const response = await api.put(`/quotations/${id}/quote`, data, { adapter: 'xhr' });
+    const response = await api.put(`/quotations/${id}/send-quote`, data, { adapter: 'xhr' });
     return response.data;
   },
 
-  // Approve quotation (admin) — fallback alias
+  // Approve quotation (admin) — legacy alias
   approveQuotation: async (
     id: string,
     data: { totalAmount: number; validUntil: string; terms?: string; adminNotes?: string }
   ): Promise<QuotationResponse> => {
-    const response = await api.put(`/quotations/${id}/approve`, data, { adapter: 'xhr' });
+    const response = await api.put(`/quotations/${id}/send-quote`, data, { adapter: 'xhr' });
     return response.data;
   },
 

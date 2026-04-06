@@ -99,7 +99,7 @@ export const AdminQuotationsScreen: React.FC = () => {
 
   const onRefresh = () => { setRefreshing(true); fetchQuotations(); };
 
-  // Send Quote — tries /quote first, falls back to /approve
+  // Send Quote — PUT /quotations/:id/send-quote
   const handleSendQuote = async () => {
     if (!sendQuoteModal) return;
     if (!quoteData.totalAmount || parseFloat(quoteData.totalAmount) <= 0) {
@@ -107,26 +107,15 @@ export const AdminQuotationsScreen: React.FC = () => {
       return;
     }
     setActionLoading(sendQuoteModal._id);
-    console.log('[SendQuote] id=', sendQuoteModal._id, 'quotationNumber=', sendQuoteModal.quotationNumber);
     try {
       const validUntil = new Date();
       validUntil.setDate(validUntil.getDate() + parseInt(quoteData.validDays, 10));
-      const payload = {
+      await quotationService.sendQuote(sendQuoteModal._id, {
         totalAmount: parseFloat(quoteData.totalAmount),
         validUntil: validUntil.toISOString(),
         terms: quoteData.terms,
         adminNotes: quoteData.adminNotes,
-      };
-      try {
-        await quotationService.sendQuote(sendQuoteModal._id, payload);
-      } catch (firstErr: any) {
-        console.log('[SendQuote] /quote failed status=', firstErr.response?.status, firstErr.message);
-        if (firstErr.response?.status === 404) {
-          await quotationService.approveQuotation(sendQuoteModal._id, payload);
-        } else {
-          throw firstErr;
-        }
-      }
+      });
       setSendQuoteModal(null);
       fetchQuotations();
       Alert.alert('Success', 'Quote sent to customer successfully!');
