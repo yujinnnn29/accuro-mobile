@@ -21,10 +21,14 @@ export const BookingStatusBadge: React.FC<BookingStatusBadgeProps> = ({
         return { label: 'Completed', variant: 'success' as const };
       case 'cancelled':
         return { label: 'Cancelled', variant: 'error' as const };
+      case 'in_progress':
+        return { label: 'In Progress', variant: 'info' as const };
       case 'rescheduled':
         return { label: 'Rescheduled', variant: 'secondary' as const };
       case 'pending_review':
-        return { label: 'In Review', variant: 'info' as const };
+        return { label: 'Pending Review', variant: 'warning' as const };
+      case 'rejected':
+        return { label: 'Rejected', variant: 'error' as const };
       default:
         return { label: status, variant: 'gray' as const };
     }

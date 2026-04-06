@@ -39,18 +39,26 @@ import { BookingStatusBadge } from '../../components/booking';
 type FilterKey = 'all' | BookingStatus;
 
 const STATUSES: { key: BookingStatus; label: string; color: string; bg: string }[] = [
-  { key: 'pending',    label: 'Pending',    color: '#92400e', bg: '#fef3c7' },
-  { key: 'confirmed',  label: 'Confirmed',  color: '#065f46', bg: '#d1fae5' },
-  { key: 'rescheduled',label: 'Rescheduled',color: '#1e40af', bg: '#dbeafe' },
-  { key: 'cancelled',  label: 'Cancelled',  color: '#991b1b', bg: '#fee2e2' },
+  { key: 'pending',       label: 'Pending',        color: '#92400e', bg: '#fef3c7' },
+  { key: 'confirmed',     label: 'Confirmed',      color: '#065f46', bg: '#d1fae5' },
+  { key: 'in_progress',   label: 'In Progress',    color: '#1e40af', bg: '#dbeafe' },
+  { key: 'pending_review',label: 'Pending Review', color: '#92400e', bg: '#fef9c3' },
+  { key: 'completed',     label: 'Completed',      color: '#065f46', bg: '#bbf7d0' },
+  { key: 'rescheduled',   label: 'Rescheduled',    color: '#5b21b6', bg: '#ede9fe' },
+  { key: 'cancelled',     label: 'Cancelled',      color: '#991b1b', bg: '#fee2e2' },
+  { key: 'rejected',      label: 'Rejected',       color: '#7f1d1d', bg: '#fecaca' },
 ];
 
 const filterOptions: { key: FilterKey; label: string }[] = [
-  { key: 'all',        label: 'All' },
-  { key: 'pending',    label: 'Pending' },
-  { key: 'confirmed',  label: 'Confirmed' },
-  { key: 'rescheduled',label: 'Rescheduled' },
-  { key: 'cancelled',  label: 'Cancelled' },
+  { key: 'all',           label: 'All' },
+  { key: 'pending',       label: 'Pending' },
+  { key: 'confirmed',     label: 'Confirmed' },
+  { key: 'in_progress',   label: 'In Progress' },
+  { key: 'pending_review',label: 'Pending Review' },
+  { key: 'completed',     label: 'Completed' },
+  { key: 'rescheduled',   label: 'Rescheduled' },
+  { key: 'cancelled',     label: 'Cancelled' },
+  { key: 'rejected',      label: 'Rejected' },
 ];
 
 function formatDate(dateStr: string) {
@@ -139,15 +147,19 @@ export const AdminBookingsScreen: React.FC = () => {
           selectedBooking._id,
           cancelReason.trim() || 'Cancelled by admin'
         );
+      } else if (selectedStatus === 'completed') {
+        await bookingService.complete(
+          selectedBooking._id,
+          cancelReason.trim() || 'Completed by admin'
+        );
       } else {
-        // confirmed / pending — generic PUT accepts these
+        // confirmed / in_progress / pending_review / rejected / pending — generic PUT
         await bookingService.update(selectedBooking._id, { status: selectedStatus }, { adapter: 'xhr' });
       }
       await fetchBookings();
       closeDetail();
       showToast();
     } catch (error: any) {
-      // Fetch adapter loses error.response; fall back to error.cause or generic message
       const data = error.response?.data ?? error.cause?.response?.data;
       const msg = data?.message || data?.error || error.message || 'Failed to update booking status';
       Alert.alert('Error', msg);
@@ -363,13 +375,21 @@ export const AdminBookingsScreen: React.FC = () => {
                   </View>
                 )}
 
-                {/* Cancel reason */}
-                {selectedStatus === 'cancelled' && (
+                {/* Extra notes for specific statuses */}
+                {(selectedStatus === 'cancelled' || selectedStatus === 'rejected' || selectedStatus === 'completed') && (
                   <View style={styles.extraFields}>
-                    <Text style={styles.extraFieldLabel}>Reason (optional)</Text>
+                    <Text style={styles.extraFieldLabel}>
+                      {selectedStatus === 'completed' ? 'Conclusion / Notes (optional)' : 'Reason (optional)'}
+                    </Text>
                     <TextInput
                       style={[styles.extraInput, { minHeight: 72, textAlignVertical: 'top' }]}
-                      placeholder="Enter reason for cancellation..."
+                      placeholder={
+                        selectedStatus === 'completed'
+                          ? 'Enter completion notes...'
+                          : selectedStatus === 'rejected'
+                          ? 'Enter reason for rejection...'
+                          : 'Enter reason for cancellation...'
+                      }
                       placeholderTextColor={colors.gray[400]}
                       value={cancelReason}
                       onChangeText={setCancelReason}
