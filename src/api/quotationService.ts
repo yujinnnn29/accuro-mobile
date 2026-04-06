@@ -38,6 +38,8 @@ export interface Quotation {
   pdfUrl?: string;
   approvedAt?: string;
   rejectedAt?: string;
+  declinedAt?: string;
+  declineReason?: string;
   company?: string;
   customerName?: string;
   customerEmail?: string;

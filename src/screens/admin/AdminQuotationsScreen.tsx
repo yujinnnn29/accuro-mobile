@@ -365,23 +365,37 @@ export const AdminQuotationsScreen: React.FC = () => {
                 </>
               ) : null}
 
-              {/* Action buttons inside detail if pending */}
-              {detailModal.status === 'pending' && (
+              {/* Declined reason */}
+              {detailModal.status === 'declined' && (
+                <>
+                  <Text style={[styles.detailSectionLabel, { color: theme.textSecondary }]}>DECLINE REASON</Text>
+                  <View style={[styles.detailCard, { backgroundColor: '#FFF7ED', borderColor: '#FED7AA' }]}>
+                    <Text style={[styles.notesText, { color: '#92400E' }]}>
+                      {detailModal.declineReason || detailModal.notes || 'No reason provided'}
+                    </Text>
+                  </View>
+                </>
+              )}
+
+              {/* Action buttons inside detail if pending or declined */}
+              {(detailModal.status === 'pending' || detailModal.status === 'declined') && (
                 <View style={styles.detailActions}>
                   <TouchableOpacity
                     style={[styles.detailSendBtn, actionLoading === detailModal._id && { opacity: 0.6 }]}
                     onPress={() => { setDetailModal(null); setQuoteData({ totalAmount: '', validDays: '30', terms: '', adminNotes: '' }); setSendQuoteModal(detailModal); }}
                   >
                     <Send size={16} color="#fff" />
-                    <Text style={styles.detailSendText}>Send Quote</Text>
+                    <Text style={styles.detailSendText}>{detailModal.status === 'declined' ? 'Re-quote' : 'Send Quote'}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.detailRejectBtn, actionLoading === detailModal._id && { opacity: 0.6 }]}
-                    onPress={() => { setDetailModal(null); setRejectReason(''); setRejectModal(detailModal); }}
-                  >
-                    <XCircle size={16} color="#dc2626" />
-                    <Text style={styles.detailRejectText}>Reject</Text>
-                  </TouchableOpacity>
+                  {detailModal.status === 'pending' && (
+                    <TouchableOpacity
+                      style={[styles.detailRejectBtn, actionLoading === detailModal._id && { opacity: 0.6 }]}
+                      onPress={() => { setDetailModal(null); setRejectReason(''); setRejectModal(detailModal); }}
+                    >
+                      <XCircle size={16} color="#dc2626" />
+                      <Text style={styles.detailRejectText}>Reject</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               )}
 
@@ -398,7 +412,7 @@ export const AdminQuotationsScreen: React.FC = () => {
             <View style={styles.bottomSheetHandle} />
             <View style={styles.bottomSheetHeader}>
               <View>
-                <Text style={[styles.bottomSheetTitle, { color: theme.text }]}>Send Quote</Text>
+                <Text style={[styles.bottomSheetTitle, { color: theme.text }]}>{sendQuoteModal?.status === 'declined' ? 'Re-quote' : 'Send Quote'}</Text>
                 <Text style={[styles.bottomSheetSubtitle, { color: theme.textSecondary }]}>{sendQuoteModal?.quotationNumber}</Text>
               </View>
               <TouchableOpacity onPress={() => setSendQuoteModal(null)}>
