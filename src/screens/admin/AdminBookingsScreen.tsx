@@ -96,8 +96,17 @@ export const AdminBookingsScreen: React.FC = () => {
     try {
       const response = await bookingService.getAll();
       setBookings(response.data || []);
-    } catch (error) {
-      console.error('Error fetching bookings:', error);
+    } catch (error: any) {
+      const isNetworkIssue = !error.response && (
+        error.name === 'AbortError' ||
+        error.code === 'ERR_CANCELED' ||
+        error.code === 'ERR_NETWORK' ||
+        error.message === 'Aborted' ||
+        error.message === 'Network Error'
+      );
+      if (!isNetworkIssue) {
+        console.error('Error fetching bookings:', error);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);

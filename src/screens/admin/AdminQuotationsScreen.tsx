@@ -50,8 +50,9 @@ export const AdminQuotationsScreen: React.FC = () => {
     try {
       const response = await quotationService.getAllQuotations();
       setQuotations(response.data || []);
-    } catch (error) {
-      console.error('Error fetching quotations:', error);
+    } catch (error: any) {
+      const isNetworkIssue = !error.response && (error.name === 'AbortError' || error.code === 'ERR_CANCELED' || error.code === 'ERR_NETWORK' || error.message === 'Aborted' || error.message === 'Network Error');
+      if (!isNetworkIssue) console.error('Error fetching quotations:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);

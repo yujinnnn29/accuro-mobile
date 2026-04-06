@@ -61,8 +61,9 @@ export const AdminProductsScreen: React.FC = () => {
       const params = selectedFilter !== 'all' ? { status: selectedFilter } : undefined;
       const response = await productService.getProducts(params);
       setProducts(response.data || []);
-    } catch (error) {
-      console.error('Error fetching products:', error);
+    } catch (error: any) {
+      const isNetworkIssue = !error.response && (error.name === 'AbortError' || error.code === 'ERR_CANCELED' || error.code === 'ERR_NETWORK' || error.message === 'Aborted' || error.message === 'Network Error');
+      if (!isNetworkIssue) console.error('Error fetching products:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);

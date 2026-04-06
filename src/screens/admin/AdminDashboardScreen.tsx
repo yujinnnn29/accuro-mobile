@@ -171,8 +171,9 @@ export const AdminDashboardScreen: React.FC = () => {
           timestamp: item.timestamp || item.createdAt || item.date || new Date().toISOString(),
         }))
       );
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+    } catch (error: any) {
+      const isNetworkIssue = !error.response && (error.name === 'AbortError' || error.code === 'ERR_CANCELED' || error.code === 'ERR_NETWORK' || error.message === 'Aborted' || error.message === 'Network Error');
+      if (!isNetworkIssue) console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);

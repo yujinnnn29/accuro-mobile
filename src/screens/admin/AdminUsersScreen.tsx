@@ -67,8 +67,9 @@ export const AdminUsersScreen: React.FC = () => {
       const response = await userService.getUsers(params);
       setUsers(response.data || []);
       setCurrentPage(1);
-    } catch (error) {
-      console.error('Error fetching users:', error);
+    } catch (error: any) {
+      const isNetworkIssue = !error.response && (error.name === 'AbortError' || error.code === 'ERR_CANCELED' || error.code === 'ERR_NETWORK' || error.message === 'Aborted' || error.message === 'Network Error');
+      if (!isNetworkIssue) console.error('Error fetching users:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);

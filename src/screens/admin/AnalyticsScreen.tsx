@@ -93,8 +93,9 @@ export const AnalyticsScreen: React.FC = () => {
       setRecentActivity(Array.isArray(activity.data) ? activity.data : []);
       setConversionFunnel(funnel.data || null);
       setQuoteData(quotes.data || null);
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
+    } catch (error: any) {
+      const isNetworkIssue = !error.response && (error.name === 'AbortError' || error.code === 'ERR_CANCELED' || error.code === 'ERR_NETWORK' || error.message === 'Aborted' || error.message === 'Network Error');
+      if (!isNetworkIssue) console.error('Error fetching analytics:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
