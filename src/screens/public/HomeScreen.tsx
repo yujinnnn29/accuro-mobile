@@ -26,6 +26,7 @@ import {
   Search,
   FileText,
   ClipboardList,
+  CalendarCheck,
   ArrowRight,
 } from 'lucide-react-native';
 import { useAuth, useNotifications, useTheme } from '../../contexts';
@@ -230,31 +231,41 @@ export const HomeScreen: React.FC = () => {
         <View style={[styles.howItWorksSection, { backgroundColor: theme.surface }]}>
           <Text style={[styles.howItWorksTitle, { color: theme.text }]}>How It Works</Text>
           <Text style={[styles.howItWorksSubtitle, { color: theme.textSecondary }]}>
-            Getting the right calibration solution is simple
+            From browsing to service completion — here's your journey with Accuro
           </Text>
           <View style={styles.stepsContainer}>
             {[
               {
                 icon: <Search size={28} color={colors.primary[600]} />,
-                title: 'Browse Our Products',
-                desc: 'Explore our comprehensive range of Beamex calibration equipment and find the right solution for your needs.',
+                title: 'Browse Products',
+                desc: 'Explore our range of Beamex calibration equipment and find the right solution.',
               },
               {
                 icon: <FileText size={28} color={colors.primary[600]} />,
-                title: 'Request a Quote or Book a Consultation',
-                desc: 'Add products to your quote list and submit a request, or schedule a meeting with our experts.',
+                title: 'Request a Quote or Book a Meeting',
+                desc: 'Submit a quotation request or schedule a consultation with our team.',
               },
               {
                 icon: <ClipboardList size={28} color={colors.primary[600]} />,
-                title: 'Get Your Custom Quote',
-                desc: "Our team will review your requirements and prepare a detailed quotation tailored to your business.",
+                title: 'Review & Accept Your Quote',
+                desc: 'Receive a detailed quotation, review it, and accept or request revisions.',
+              },
+              {
+                icon: <UserCheck size={28} color={colors.primary[600]} />,
+                title: 'Technician Dispatched',
+                desc: 'A certified technician is assigned to your booking and dispatched to your location.',
+              },
+              {
+                icon: <CalendarCheck size={28} color={colors.primary[600]} />,
+                title: 'Service Completed',
+                desc: 'Your technician completes the service and submits a verified completion report.',
               },
             ].map((step, i) => (
               <View key={i} style={styles.step}>
                 <View style={styles.stepNumberBadge}>
                   <Text style={styles.stepNumber}>{i + 1}</Text>
                 </View>
-                {i < 2 && <View style={styles.stepConnector} />}
+                {i < 4 && <View style={styles.stepConnector} />}
                 <View style={styles.stepIconCircle}>{step.icon}</View>
                 <Text style={[styles.stepTitle, { color: theme.text }]}>{step.title}</Text>
                 <Text style={[styles.stepDesc, { color: theme.textSecondary }]}>{step.desc}</Text>
