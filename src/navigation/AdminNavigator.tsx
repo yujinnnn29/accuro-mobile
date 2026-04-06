@@ -406,8 +406,11 @@ const styles = StyleSheet.create({
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 16,
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray[100],
   },
   logoutText: {
     marginLeft: 12,

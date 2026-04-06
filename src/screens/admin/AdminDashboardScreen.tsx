@@ -62,15 +62,18 @@ export const AdminDashboardScreen: React.FC = () => {
     try {
       const now = new Date();
       const today = now.toISOString().split('T')[0];
+      // Use full day range so $gte/$lte in MongoDB covers the whole day
+      const todayStart = `${today}T00:00:00.000Z`;
+      const todayEnd = `${today}T23:59:59.999Z`;
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      const monthEnd = `${new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]}T23:59:59.999Z`;
 
       // Use xhr adapter for all calls to avoid Axios fetch-adapter silent failure bug
       const [analyticsRes, quotationsRes, todayRes, completedMonthRes] = await Promise.all([
         api.get('/analytics/dashboard', { adapter: 'xhr' }).catch(() => ({ data: null })),
         api.get('/quotations', { params: { status: 'pending' }, adapter: 'xhr' }).catch(() => ({ data: null })),
-        api.get('/bookings', { params: { startDate: today, endDate: today }, adapter: 'xhr' }).catch(() => ({ data: null })),
-        api.get('/bookings', { params: { startDate: monthStart, endDate: monthEnd, status: 'completed' }, adapter: 'xhr' }).catch(() => ({ data: null })),
+        api.get('/bookings', { params: { startDate: todayStart, endDate: todayEnd }, adapter: 'xhr' }).catch(() => ({ data: null })),
+        api.get('/bookings', { params: { startDate: `${monthStart}T00:00:00.000Z`, endDate: monthEnd, status: 'completed' }, adapter: 'xhr' }).catch(() => ({ data: null })),
       ]);
 
       // Analytics response for pending count
@@ -101,11 +104,11 @@ export const AdminDashboardScreen: React.FC = () => {
       setPendingQuotations(pendingQuoteCount);
       setPendingReviews(pendingReviewCount);
 
-      // Today's schedule — from a fresh xhr call
+      // Today's schedule — use same full-day range
       let todayData: any[] = [];
       try {
         const schedRes = await api.get('/bookings', {
-          params: { startDate: today, endDate: today },
+          params: { startDate: todayStart, endDate: todayEnd },
           adapter: 'xhr',
         });
         todayData = schedRes.data?.data || [];
