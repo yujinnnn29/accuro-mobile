@@ -92,7 +92,16 @@ export const quotationService = {
     return response.data;
   },
 
-  // Approve quotation (admin)
+  // Send quote to customer (admin) — transitions pending → quoted
+  sendQuote: async (
+    id: string,
+    data: { totalAmount: number; validUntil: string; terms?: string; adminNotes?: string }
+  ): Promise<QuotationResponse> => {
+    const response = await api.put(`/quotations/${id}/quote`, data, { adapter: 'xhr' });
+    return response.data;
+  },
+
+  // Approve quotation (admin) — fallback alias
   approveQuotation: async (
     id: string,
     data: { totalAmount: number; validUntil: string; terms?: string; adminNotes?: string }
