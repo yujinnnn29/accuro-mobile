@@ -118,16 +118,12 @@ const CustomDrawerContent: React.FC<DrawerContentComponentProps> = (props) => {
         </View>
       </View>
 
-      {/* Back to Website Button */}
+      {/* Bottom actions: Back to Website + Logout */}
       <View style={[styles.backSection, { backgroundColor: theme.surface, borderTopColor: theme.border }]}>
         <TouchableOpacity style={[styles.backButton, { backgroundColor: isDark ? theme.border : colors.primary[50] }]} onPress={handleBackToWebsite}>
           <Home size={20} color={colors.primary[600]} />
           <Text style={styles.backText}>Back to Website</Text>
         </TouchableOpacity>
-      </View>
-
-      {/* Logout Button */}
-      <View style={[styles.logoutSection, { backgroundColor: theme.surface, borderTopColor: theme.border }]}>
         <TouchableOpacity style={styles.logoutButton} onPress={logout}>
           <LogOut size={20} color={colors.error} />
           <Text style={styles.logoutText}>Logout</Text>
