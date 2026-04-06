@@ -61,9 +61,11 @@ export const AdminDashboardScreen: React.FC = () => {
   const fetchDashboardData = useCallback(async () => {
     try {
       const now = new Date();
-      const today = now.toISOString().split('T')[0]; // "YYYY-MM-DD"
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      // Use LOCAL date (not UTC) — device may be UTC+8, toISOString gives UTC date which is "yesterday"
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+      const monthStart = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+      const monthEnd = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate())}`;
 
       // Fetch all bookings + quotations + analytics in parallel
       // (website counts today's bookings client-side from full list)
@@ -82,13 +84,15 @@ export const AdminDashboardScreen: React.FC = () => {
 
       const pendingBookingCount = getStatusCount('pending');
 
-      // Count today's bookings client-side (same as website)
+      // Count today's bookings client-side using LOCAL date comparison
       const allBookings: any[] = allBookingsRes.data?.data ?? allBookingsRes.data ?? [];
+      const getLocalDateStr = (dateVal: any): string => {
+        if (!dateVal) return '';
+        const d = new Date(dateVal);
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      };
       const todayCount = Array.isArray(allBookings)
-        ? allBookings.filter((b: any) => {
-            const d = b.date ? (b.date as string).split('T')[0] : '';
-            return d === today;
-          }).length
+        ? allBookings.filter((b: any) => getLocalDateStr(b.date) === today).length
         : 0;
 
       // Completed this month
@@ -107,13 +111,10 @@ export const AdminDashboardScreen: React.FC = () => {
       setPendingQuotations(pendingQuoteCount);
       setPendingReviews(0);
 
-      // Today's schedule — filter from the full bookings list already fetched
+      // Today's schedule — filter from full bookings list using local date
       let todayData: any[] = [];
       if (Array.isArray(allBookings)) {
-        todayData = allBookings.filter((b: any) => {
-          const d = b.date ? (b.date as string).split('T')[0] : '';
-          return d === today;
-        });
+        todayData = allBookings.filter((b: any) => getLocalDateStr(b.date) === today);
       }
       setTodaySchedule(
         todayData.map((item: any) => ({

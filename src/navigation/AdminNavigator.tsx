@@ -100,6 +100,15 @@ const CustomDrawerContent: React.FC<DrawerContentComponentProps> = (props) => {
         />
       </View>
 
+      {/* Admin Info — compact landscape row */}
+      <View style={[styles.infoRow, { backgroundColor: isDark ? theme.surface : colors.primary[50], borderColor: isDark ? theme.border : colors.primary[100] }]}>
+        <View style={[styles.infoRowIcon, { backgroundColor: isDark ? theme.border : colors.primary[100] }]}>
+          <Shield size={14} color={colors.primary[600]} />
+        </View>
+        <Text style={[styles.infoRowText, { color: isDark ? colors.primary[300] : colors.primary[700] }]}>Accuro Admin Panel</Text>
+        <Text style={[styles.infoRowVersion, { color: isDark ? colors.primary[400] : colors.primary[500] }]}>v1.0</Text>
+      </View>
+
       {/* Bottom actions: Back to Website + Logout */}
       <View style={[styles.backSection, { backgroundColor: theme.surface, borderTopColor: theme.border, paddingBottom: Math.max(insets.bottom, 8) }]}>
         <TouchableOpacity style={[styles.backButton, { backgroundColor: isDark ? theme.border : colors.primary[50] }]} onPress={handleBackToWebsite}>
@@ -321,6 +330,33 @@ const styles = StyleSheet.create({
   },
   darkModeSwitch: {
     transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }],
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+  },
+  infoRowIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoRowText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  infoRowVersion: {
+    fontSize: 11,
+    fontWeight: '500',
   },
   infoCard: {
     flexDirection: 'row',
