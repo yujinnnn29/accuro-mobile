@@ -97,13 +97,13 @@ export const quotationService = {
     id: string,
     data: { totalAmount: number; validUntil: string; terms?: string; adminNotes?: string }
   ): Promise<QuotationResponse> => {
-    const response = await api.put(`/quotations/${id}/approve`, data);
+    const response = await api.put(`/quotations/${id}/approve`, data, { adapter: 'xhr' });
     return response.data;
   },
 
   // Reject quotation (admin)
   rejectQuotation: async (id: string, reason?: string): Promise<QuotationResponse> => {
-    const response = await api.put(`/quotations/${id}/reject`, { reason });
+    const response = await api.put(`/quotations/${id}/reject`, { reason }, { adapter: 'xhr' });
     return response.data;
   },
 

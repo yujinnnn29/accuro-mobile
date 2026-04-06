@@ -116,7 +116,8 @@ export const AdminQuotationsScreen: React.FC = () => {
       fetchQuotations();
       Alert.alert('Success', 'Quote sent to customer successfully!');
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to send quote');
+      const msg = error.response?.data?.message || error.response?.data?.error || error.cause?.response?.data?.message || error.message || 'Failed to send quote';
+      Alert.alert('Error', msg);
     } finally {
       setActionLoading(null);
     }
