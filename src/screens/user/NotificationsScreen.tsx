@@ -9,9 +9,10 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { CheckCheck, Trash2 } from 'lucide-react-native';
 import { notificationService } from '../../api';
-import { useSocket, useNotifications, useTheme } from '../../contexts';
+import { useSocket, useNotifications, useTheme, useAuth } from '../../contexts';
 import { colors } from '../../theme';
 import { LoadingSpinner, FilterTabs, EmptyState } from '../../components/common';
 import { NotificationCard, Notification } from '../../components/notification';
@@ -24,10 +25,22 @@ const filterOptions: { key: FilterKey; label: string }[] = [
   { key: 'read', label: 'Read' },
 ];
 
+// Parse a notification link like "/bookings/abc123" or "/quotations/xyz"
+const parseLinkId = (link?: string): { type: 'booking' | 'quotation' | null; id: string } => {
+  if (!link) return { type: null, id: '' };
+  const bookingMatch = link.match(/\/bookings\/([a-f0-9]{24})/i);
+  const quotationMatch = link.match(/\/quotations\/([a-f0-9]{24})/i);
+  if (bookingMatch) return { type: 'booking', id: bookingMatch[1] };
+  if (quotationMatch) return { type: 'quotation', id: quotationMatch[1] };
+  return { type: null, id: '' };
+};
+
 export const NotificationsScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
   const { onNotification } = useSocket();
   const { refreshUnreadCount } = useNotifications();
   const { isDark, theme } = useTheme();
+  const { isAdmin } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -73,6 +86,36 @@ export const NotificationsScreen: React.FC = () => {
       refreshUnreadCount();
     } catch (error) {
       console.error('Error marking as read:', error);
+    }
+  };
+
+  const handleNotificationPress = (notification: Notification) => {
+    // Mark as read
+    if (!notification.isRead) {
+      handleMarkAsRead(notification._id);
+    }
+    // Navigate based on link
+    const { type, id } = parseLinkId(notification.link);
+    if (isAdmin) {
+      // Admin context — navigate within admin drawer
+      if (type === 'booking') {
+        navigation.navigate('AdminBookings');
+      } else if (type === 'quotation') {
+        navigation.navigate('AdminQuotations');
+      }
+    } else {
+      // User context — navigate within tab navigator
+      if (type === 'booking' && id) {
+        navigation.getParent()?.navigate('BookingsTab', {
+          screen: 'BookingDetail',
+          params: { bookingId: id },
+        });
+      } else if (type === 'quotation' && id) {
+        navigation.getParent()?.navigate('MoreTab', {
+          screen: 'QuotationDetail',
+          params: { quotationId: id },
+        });
+      }
     }
   };
 
@@ -156,6 +199,7 @@ export const NotificationsScreen: React.FC = () => {
   const renderNotification = ({ item }: { item: Notification }) => (
     <NotificationCard
       notification={item}
+      onPress={() => handleNotificationPress(item)}
       onMarkAsRead={() => handleMarkAsRead(item._id)}
       onDelete={() => handleDeleteNotification(item._id)}
     />

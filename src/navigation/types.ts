@@ -100,6 +100,7 @@ export type AdminDrawerParamList = {
   AdminActivityLogs: undefined;
   AdminSettings: undefined;
   AdminRecommendations: undefined;
+  AdminNotifications: undefined;
 };
 
 // Utility type for navigation prop

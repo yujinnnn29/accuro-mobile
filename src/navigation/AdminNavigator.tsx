@@ -13,6 +13,7 @@ import {
   Shield,
   Moon,
   Activity,
+  Bell,
 } from 'lucide-react-native';
 import { CommonActions } from '@react-navigation/native';
 import { useAuth, useTheme } from '../contexts';
@@ -25,6 +26,8 @@ import AdminBookingsScreen from '../screens/admin/AdminBookingsScreen';
 import AdminQuotationsScreen from '../screens/admin/AdminQuotationsScreen';
 import AdminReviewsScreen from '../screens/admin/AdminReviewsScreen';
 import ActivityLogsScreen from '../screens/admin/ActivityLogsScreen';
+import { NotificationsScreen } from '../screens/user/NotificationsScreen';
+import { useNotifications } from '../contexts';
 
 const Drawer = createDrawerNavigator<AdminDrawerParamList>();
 
@@ -136,6 +139,7 @@ const CustomDrawerContent: React.FC<DrawerContentComponentProps> = (props) => {
 
 export const AdminNavigator: React.FC = () => {
   const { isDark, theme } = useTheme();
+  const { unreadCount } = useNotifications();
   return (
     <Drawer.Navigator
       drawerContent={(props) => <CustomDrawerContent {...props} />}
@@ -215,8 +219,46 @@ export const AdminNavigator: React.FC = () => {
           ),
         }}
       />
+      <Drawer.Screen
+        name="AdminNotifications"
+        component={NotificationsScreen}
+        options={{
+          title: 'Notifications',
+          drawerIcon: ({ color, size }) => (
+            <View>
+              <Bell size={size} color={color} />
+              {unreadCount > 0 && (
+                <View style={notifBadgeStyle}>
+                  <Text style={notifBadgeTextStyle}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ),
+        }}
+      />
     </Drawer.Navigator>
   );
+};
+
+// Small inline styles for the notification badge in the drawer icon
+const notifBadgeStyle: any = {
+  position: 'absolute',
+  top: -4,
+  right: -8,
+  backgroundColor: colors.error,
+  borderRadius: 7,
+  minWidth: 14,
+  height: 14,
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingHorizontal: 2,
+};
+const notifBadgeTextStyle: any = {
+  color: '#fff',
+  fontSize: 8,
+  fontWeight: 'bold',
 };
 
 const styles = StyleSheet.create({
