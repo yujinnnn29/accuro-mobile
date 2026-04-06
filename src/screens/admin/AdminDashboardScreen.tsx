@@ -23,7 +23,6 @@ import { useAuth, useTheme } from '../../contexts';
 import { bookingService } from '../../api';
 import api from '../../api/api';
 import { colors } from '../../theme';
-import { LoadingSpinner } from '../../components/common';
 import {
   DashboardStatCard,
   TodayScheduleCard,
@@ -41,8 +40,8 @@ export const AdminDashboardScreen: React.FC = () => {
   const navigation = useNavigation<DrawerNavigationProp<AdminDrawerParamList>>();
   const { user } = useAuth();
   const { theme } = useTheme();
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(true); // show pull-indicator on first load
 
   // Dashboard stats
   const [stats, setStats] = useState<DashboardStats>({
@@ -213,10 +212,6 @@ export const AdminDashboardScreen: React.FC = () => {
         break;
     }
   };
-
-  if (loading) {
-    return <LoadingSpinner fullScreen text="Loading dashboard..." />;
-  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['bottom']}>
