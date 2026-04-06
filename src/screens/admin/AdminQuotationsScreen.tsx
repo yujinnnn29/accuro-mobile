@@ -8,43 +8,75 @@ import {
   Alert,
   TextInput,
   Modal,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, FileText, Package } from 'lucide-react-native';
+import {
+  Search,
+  Package,
+  X,
+  Send,
+  XCircle,
+  Eye,
+  User,
+  Building2,
+  Calendar,
+  ChevronRight,
+  FileText,
+  CheckCircle,
+  Clock,
+} from 'lucide-react-native';
 import { quotationService, Quotation } from '../../api';
 import { colors } from '../../theme';
 import { useTheme } from '../../contexts';
-import { LoadingSpinner, FilterTabs, EmptyState, Card, Button, Input } from '../../components/common';
+import { FilterTabs, EmptyState } from '../../components/common';
 import { QuotationStatusBadge } from '../../components/quotation';
 
-type FilterKey = 'all' | 'pending' | 'approved' | 'rejected';
+type FilterKey = 'all' | 'pending' | 'quoted' | 'accepted' | 'declined' | 'rejected' | 'expired';
 
-const filterOptions: { key: FilterKey; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'pending', label: 'Pending' },
-  { key: 'approved', label: 'Approved' },
+const FILTER_OPTIONS: { key: FilterKey; label: string }[] = [
+  { key: 'all',      label: 'All' },
+  { key: 'pending',  label: 'Pending' },
+  { key: 'quoted',   label: 'Quoted' },
+  { key: 'accepted', label: 'Accepted' },
+  { key: 'declined', label: 'Declined' },
   { key: 'rejected', label: 'Rejected' },
+  { key: 'expired',  label: 'Expired' },
 ];
 
+const formatDate = (dateString: string) => {
+  if (!dateString) return '—';
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const formatCurrency = (amount?: number) => {
+  if (amount == null) return null;
+  return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(amount);
+};
+
 export const AdminQuotationsScreen: React.FC = () => {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const [quotations, setQuotations] = useState<Quotation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState<FilterKey>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  // Approve modal
-  const [approveModal, setApproveModal] = useState<{visible: boolean; quotation: Quotation | null}>({
-    visible: false,
-    quotation: null,
-  });
-  const [approveData, setApproveData] = useState({
-    totalAmount: '',
-    validDays: '30',
-    terms: '',
-  });
+  // Detail modal
+  const [detailModal, setDetailModal] = useState<Quotation | null>(null);
+
+  // Send Quote modal
+  const [sendQuoteModal, setSendQuoteModal] = useState<Quotation | null>(null);
+  const [quoteData, setQuoteData] = useState({ totalAmount: '', validDays: '30', terms: '', adminNotes: '' });
+
+  // Reject modal
+  const [rejectModal, setRejectModal] = useState<Quotation | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   const fetchQuotations = useCallback(async () => {
     try {
@@ -59,260 +91,428 @@ export const AdminQuotationsScreen: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {
-    fetchQuotations();
-  }, [fetchQuotations]);
+  useEffect(() => { fetchQuotations(); }, [fetchQuotations]);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchQuotations();
-  };
+  const onRefresh = () => { setRefreshing(true); fetchQuotations(); };
 
-  const openApproveModal = (quotation: Quotation) => {
-    setApproveData({ totalAmount: '', validDays: '30', terms: '' });
-    setApproveModal({ visible: true, quotation });
-  };
-
-  const handleApprove = async () => {
-    if (!approveModal.quotation) return;
-
-    if (!approveData.totalAmount || parseFloat(approveData.totalAmount) <= 0) {
-      Alert.alert('Error', 'Please enter a valid total amount');
+  // Send Quote (approve)
+  const handleSendQuote = async () => {
+    if (!sendQuoteModal) return;
+    if (!quoteData.totalAmount || parseFloat(quoteData.totalAmount) <= 0) {
+      Alert.alert('Required', 'Please enter a valid total amount.');
       return;
     }
-
-    setActionLoading(approveModal.quotation._id);
+    setActionLoading(sendQuoteModal._id);
     try {
       const validUntil = new Date();
-      validUntil.setDate(validUntil.getDate() + parseInt(approveData.validDays, 10));
-
-      await quotationService.approveQuotation(approveModal.quotation._id, {
-        totalAmount: parseFloat(approveData.totalAmount),
+      validUntil.setDate(validUntil.getDate() + parseInt(quoteData.validDays, 10));
+      await quotationService.approveQuotation(sendQuoteModal._id, {
+        totalAmount: parseFloat(quoteData.totalAmount),
         validUntil: validUntil.toISOString(),
-        terms: approveData.terms,
+        terms: quoteData.terms,
+        adminNotes: quoteData.adminNotes,
       });
-
-      setApproveModal({ visible: false, quotation: null });
+      setSendQuoteModal(null);
       fetchQuotations();
-      Alert.alert('Success', 'Quotation approved successfully');
+      Alert.alert('Success', 'Quote sent to customer successfully!');
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to approve quotation');
+      Alert.alert('Error', error.response?.data?.message || 'Failed to send quote');
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleReject = async (quotationId: string) => {
-    Alert.alert(
-      'Reject Quotation',
-      'Are you sure you want to reject this quotation?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reject',
-          style: 'destructive',
-          onPress: async () => {
-            setActionLoading(quotationId);
-            try {
-              await quotationService.rejectQuotation(quotationId, 'Rejected by admin');
-              fetchQuotations();
-            } catch (error: any) {
-              Alert.alert('Error', error.response?.data?.message || 'Failed to reject quotation');
-            } finally {
-              setActionLoading(null);
-            }
-          },
-        },
-      ]
-    );
+  // Reject
+  const handleRejectConfirm = async () => {
+    if (!rejectModal) return;
+    setActionLoading(rejectModal._id);
+    try {
+      await quotationService.rejectQuotation(rejectModal._id, rejectReason || 'Rejected by admin');
+      setRejectModal(null);
+      setRejectReason('');
+      fetchQuotations();
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.message || 'Failed to reject quotation');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const filteredQuotations = quotations
     .filter((q) => selectedFilter === 'all' || q.status === selectedFilter)
-    .filter((q) => q.quotationNumber.toLowerCase().includes(searchQuery.toLowerCase()));
+    .filter((q) =>
+      !searchQuery ||
+      q.quotationNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (q.customerName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (q.company || '').toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
-  const getFilterCounts = () => {
-    return filterOptions.map((option) => ({
-      ...option,
-      count: option.key === 'all'
-        ? quotations.length
-        : quotations.filter((q) => q.status === option.key).length,
+  const getFilterOptions = () =>
+    FILTER_OPTIONS.map((opt) => ({
+      ...opt,
+      count: opt.key === 'all' ? quotations.length : quotations.filter((q) => q.status === opt.key).length,
+      highlight: opt.key === 'pending' && quotations.filter((q) => q.status === 'pending').length > 0,
     }));
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
 
   const renderQuotation = ({ item }: { item: Quotation }) => {
+    const isPending = item.status === 'pending';
+    const isQuoted = item.status === 'quoted';
+    const isActioning = actionLoading === item._id;
     const itemCount = item.items.reduce((sum, i) => sum + i.quantity, 0);
 
     return (
-      <Card style={styles.quotationCard} padding="md">
-        <View style={styles.quotationHeader}>
-          <View style={styles.quotationInfo}>
-            <Text style={[styles.quotationNumber, { color: theme.text }]}>{item.quotationNumber}</Text>
-            <Text style={[styles.quotationDate, { color: theme.textSecondary }]}>{formatDate(item.createdAt)}</Text>
+      <View style={[styles.card, { backgroundColor: theme.surface }]}>
+        {/* Card Header */}
+        <View style={styles.cardHeader}>
+          <View style={styles.cardHeaderLeft}>
+            <View style={[styles.cardIcon, { backgroundColor: colors.primary[50] }]}>
+              <FileText size={18} color={colors.primary[600]} />
+            </View>
+            <View>
+              <Text style={[styles.cardQNumber, { color: theme.text }]}>{item.quotationNumber}</Text>
+              <Text style={[styles.cardDate, { color: theme.textSecondary }]}>{formatDate(item.createdAt)}</Text>
+            </View>
           </View>
-          <QuotationStatusBadge status={item.status} size="sm" />
+          <QuotationStatusBadge status={item.status as any} size="sm" />
         </View>
 
-        <View style={[styles.itemsSection, { borderTopColor: theme.border }]}>
-          <View style={styles.itemsHeader}>
-            <Package size={16} color={colors.gray[400]} />
-            <Text style={[styles.itemsCount, { color: theme.textSecondary }]}>
-              {itemCount} {itemCount === 1 ? 'item' : 'items'}
-            </Text>
+        {/* Customer info */}
+        {(item.customerName || item.company) ? (
+          <View style={[styles.customerRow, { borderTopColor: theme.border }]}>
+            {item.customerName ? (
+              <View style={styles.customerItem}>
+                <User size={13} color={colors.gray[400]} />
+                <Text style={[styles.customerText, { color: theme.textSecondary }]} numberOfLines={1}>{item.customerName}</Text>
+              </View>
+            ) : null}
+            {item.company ? (
+              <View style={styles.customerItem}>
+                <Building2 size={13} color={colors.gray[400]} />
+                <Text style={[styles.customerText, { color: theme.textSecondary }]} numberOfLines={1}>{item.company}</Text>
+              </View>
+            ) : null}
           </View>
-          {item.items.slice(0, 2).map((i, index) => (
-            <Text key={index} style={[styles.itemName, { color: theme.textSecondary }]} numberOfLines={1}>
-              {i.quantity}x {i.productName}
-            </Text>
-          ))}
-          {item.items.length > 2 && (
-            <Text style={styles.moreItems}>+{item.items.length - 2} more</Text>
+        ) : null}
+
+        {/* Items preview */}
+        <View style={[styles.itemsRow, { borderTopColor: theme.border }]}>
+          <Package size={14} color={colors.gray[400]} />
+          <Text style={[styles.itemsCount, { color: theme.textSecondary }]}>
+            {itemCount} {itemCount === 1 ? 'item' : 'items'}
+          </Text>
+          <Text style={[styles.itemsPreview, { color: theme.textSecondary }]} numberOfLines={1}>
+            {item.items.slice(0, 2).map((i) => `${i.quantity}x ${i.productName}`).join(', ')}
+            {item.items.length > 2 ? ` +${item.items.length - 2} more` : ''}
+          </Text>
+        </View>
+
+        {/* Amount if quoted/accepted */}
+        {item.totalAmount != null && (
+          <View style={[styles.amountRow, { borderTopColor: theme.border }]}>
+            <Text style={[styles.amountLabel, { color: theme.textSecondary }]}>Quoted Amount</Text>
+            <Text style={styles.amountValue}>{formatCurrency(item.totalAmount)}</Text>
+          </View>
+        )}
+
+        {/* Action buttons */}
+        <View style={[styles.cardFooter, { borderTopColor: theme.border }]}>
+          {/* View Details — always shown */}
+          <TouchableOpacity
+            style={[styles.footerBtn, styles.viewBtn, { borderColor: theme.border }]}
+            onPress={() => setDetailModal(item)}
+          >
+            <Eye size={14} color={colors.primary[600]} />
+            <Text style={[styles.footerBtnText, { color: colors.primary[600] }]}>View Details</Text>
+          </TouchableOpacity>
+
+          {isPending && (
+            <>
+              <TouchableOpacity
+                style={[styles.footerBtn, styles.sendBtn, isActioning && { opacity: 0.6 }]}
+                onPress={() => { setQuoteData({ totalAmount: '', validDays: '30', terms: '', adminNotes: '' }); setSendQuoteModal(item); }}
+                disabled={isActioning}
+              >
+                {isActioning ? <ActivityIndicator size="small" color="#fff" /> : <Send size={14} color="#fff" />}
+                <Text style={styles.sendBtnText}>Send Quote</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.footerBtn, styles.rejectBtn, isActioning && { opacity: 0.6 }]}
+                onPress={() => { setRejectReason(''); setRejectModal(item); }}
+                disabled={isActioning}
+              >
+                <XCircle size={14} color="#dc2626" />
+                <Text style={styles.rejectBtnText}>Reject</Text>
+              </TouchableOpacity>
+            </>
           )}
         </View>
-
-        {item.status === 'pending' && (
-          <View style={styles.actionButtons}>
-            <Button
-              title="Approve"
-              onPress={() => openApproveModal(item)}
-              size="sm"
-              loading={actionLoading === item._id}
-              style={styles.actionButton}
-            />
-            <Button
-              title="Reject"
-              onPress={() => handleReject(item._id)}
-              variant="danger"
-              size="sm"
-              loading={actionLoading === item._id}
-              style={styles.actionButton}
-            />
-          </View>
-        )}
-
-        {item.status === 'approved' && item.totalAmount && (
-          <View style={[styles.approvedInfo, { borderTopColor: theme.border }]}>
-            <Text style={[styles.approvedLabel, { color: theme.textSecondary }]}>Approved Amount:</Text>
-            <Text style={styles.approvedAmount}>
-              PHP {item.totalAmount.toLocaleString()}
-            </Text>
-          </View>
-        )}
-      </Card>
+      </View>
     );
   };
 
-  const renderEmpty = () => (
-    <EmptyState
-      icon="file"
-      title="No Quotations Found"
-      description="There are no quotations to display."
-    />
-  );
-
-  if (loading) {
-    return <LoadingSpinner fullScreen text="Loading quotations..." />;
-  }
-
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['bottom']}>
-      {/* Search Bar */}
+      {/* Search */}
       <View style={[styles.searchContainer, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
-        <View style={[styles.searchBar, { backgroundColor: theme.background }]}>
-          <Search size={20} color={colors.gray[400]} />
+        <View style={[styles.searchBar, { backgroundColor: isDark ? theme.background : colors.gray[100] }]}>
+          <Search size={17} color={colors.gray[400]} />
           <TextInput
             style={[styles.searchInput, { color: theme.text }]}
-            placeholder="Search by quotation number..."
+            placeholder="Search by number, name, or company..."
             placeholderTextColor={colors.gray[400]}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <X size={15} color={colors.gray[400]} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
       {/* Filters */}
       <View style={[styles.filterContainer, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
         <FilterTabs
-          options={getFilterCounts()}
+          options={getFilterOptions()}
           selectedKey={selectedFilter}
           onSelect={(key) => setSelectedFilter(key as FilterKey)}
         />
       </View>
 
-      {/* Quotations List */}
+      {/* List */}
       <FlatList
         data={filteredQuotations}
         renderItem={renderQuotation}
         keyExtractor={(item) => item._id}
         contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        ListEmptyComponent={
+          <EmptyState icon="file" title="No Quotations Found" description="There are no quotations to display." />
         }
-        ListEmptyComponent={renderEmpty}
         showsVerticalScrollIndicator={false}
       />
 
-      {/* Approve Modal */}
-      <Modal
-        visible={approveModal.visible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setApproveModal({ visible: false, quotation: null })}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Approve Quotation</Text>
-            <Text style={styles.modalSubtitle}>
-              {approveModal.quotation?.quotationNumber}
-            </Text>
-
-            <Input
-              label="Total Amount (PHP)"
-              value={approveData.totalAmount}
-              onChangeText={(value) => setApproveData({ ...approveData, totalAmount: value })}
-              keyboardType="numeric"
-              placeholder="Enter total amount"
-            />
-
-            <Input
-              label="Valid for (days)"
-              value={approveData.validDays}
-              onChangeText={(value) => setApproveData({ ...approveData, validDays: value })}
-              keyboardType="numeric"
-              containerStyle={styles.inputSpacing}
-            />
-
-            <Input
-              label="Terms & Conditions (Optional)"
-              value={approveData.terms}
-              onChangeText={(value) => setApproveData({ ...approveData, terms: value })}
-              multiline
-              numberOfLines={3}
-              containerStyle={styles.inputSpacing}
-            />
-
-            <View style={styles.modalButtons}>
-              <Button
-                title="Cancel"
-                onPress={() => setApproveModal({ visible: false, quotation: null })}
-                variant="outline"
-                style={styles.modalButton}
-              />
-              <Button
-                title="Approve"
-                onPress={handleApprove}
-                loading={actionLoading === approveModal.quotation?._id}
-                style={styles.modalButton}
-              />
+      {/* ── Detail Modal ── */}
+      <Modal visible={!!detailModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setDetailModal(null)}>
+        {detailModal && (
+          <SafeAreaView style={[styles.modalSheet, { backgroundColor: theme.background }]} edges={['top', 'bottom']}>
+            <View style={[styles.modalHeader, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>Quotation Details</Text>
+              <TouchableOpacity onPress={() => setDetailModal(null)} style={styles.modalCloseBtn}>
+                <X size={22} color={theme.textSecondary} />
+              </TouchableOpacity>
             </View>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalBody}>
+              {/* Status */}
+              <View style={styles.detailStatusRow}>
+                <QuotationStatusBadge status={detailModal.status as any} size="md" />
+                <Text style={[styles.detailQNumber, { color: theme.textSecondary }]}>{detailModal.quotationNumber}</Text>
+              </View>
+
+              {/* Info card */}
+              <View style={[styles.detailCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <DetailRow label="Requested On" value={formatDate(detailModal.createdAt)} />
+                {detailModal.validUntil && <DetailRow label="Valid Until" value={formatDate(detailModal.validUntil)} />}
+                {detailModal.customerName && <DetailRow label="Customer" value={detailModal.customerName} />}
+                {detailModal.customerEmail && <DetailRow label="Email" value={detailModal.customerEmail} />}
+                {detailModal.company && <DetailRow label="Company" value={detailModal.company} />}
+                {detailModal.totalAmount != null && (
+                  <DetailRow label="Total Amount" value={formatCurrency(detailModal.totalAmount) || ''} highlight />
+                )}
+                {detailModal.paymentTerms && <DetailRow label="Payment Terms" value={detailModal.paymentTerms} />}
+                {detailModal.deliveryTerms && <DetailRow label="Delivery Terms" value={detailModal.deliveryTerms} last />}
+              </View>
+
+              {/* Items */}
+              <Text style={[styles.detailSectionLabel, { color: theme.textSecondary }]}>REQUESTED ITEMS</Text>
+              <View style={[styles.detailCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                {detailModal.items.map((item, idx) => (
+                  <View key={idx} style={[styles.itemRow, idx < detailModal.items.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.border }]}>
+                    <View style={styles.itemDot} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.itemRowName, { color: theme.text }]}>{item.productName}</Text>
+                      <Text style={[styles.itemRowQty, { color: theme.textSecondary }]}>Qty: {item.quantity}</Text>
+                      {item.specifications ? <Text style={[styles.itemRowSpec, { color: theme.textSecondary }]}>{item.specifications}</Text> : null}
+                    </View>
+                  </View>
+                ))}
+              </View>
+
+              {/* Notes */}
+              {detailModal.additionalRequirements ? (
+                <>
+                  <Text style={[styles.detailSectionLabel, { color: theme.textSecondary }]}>CUSTOMER NOTES</Text>
+                  <View style={[styles.detailCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                    <Text style={[styles.notesText, { color: theme.text }]}>{detailModal.additionalRequirements}</Text>
+                  </View>
+                </>
+              ) : null}
+
+              {detailModal.adminNotes ? (
+                <>
+                  <Text style={[styles.detailSectionLabel, { color: theme.textSecondary }]}>ADMIN NOTES</Text>
+                  <View style={[styles.detailCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                    <Text style={[styles.notesText, { color: theme.text }]}>{detailModal.adminNotes}</Text>
+                  </View>
+                </>
+              ) : null}
+
+              {/* Action buttons inside detail if pending */}
+              {detailModal.status === 'pending' && (
+                <View style={styles.detailActions}>
+                  <TouchableOpacity
+                    style={[styles.detailSendBtn, actionLoading === detailModal._id && { opacity: 0.6 }]}
+                    onPress={() => { setDetailModal(null); setQuoteData({ totalAmount: '', validDays: '30', terms: '', adminNotes: '' }); setSendQuoteModal(detailModal); }}
+                  >
+                    <Send size={16} color="#fff" />
+                    <Text style={styles.detailSendText}>Send Quote</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.detailRejectBtn, actionLoading === detailModal._id && { opacity: 0.6 }]}
+                    onPress={() => { setDetailModal(null); setRejectReason(''); setRejectModal(detailModal); }}
+                  >
+                    <XCircle size={16} color="#dc2626" />
+                    <Text style={styles.detailRejectText}>Reject</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              <View style={{ height: 24 }} />
+            </ScrollView>
+          </SafeAreaView>
+        )}
+      </Modal>
+
+      {/* ── Send Quote Modal ── */}
+      <Modal visible={!!sendQuoteModal} animationType="slide" transparent onRequestClose={() => setSendQuoteModal(null)}>
+        <View style={styles.bottomSheetOverlay}>
+          <View style={[styles.bottomSheet, { backgroundColor: theme.surface }]}>
+            <View style={styles.bottomSheetHandle} />
+            <View style={styles.bottomSheetHeader}>
+              <View>
+                <Text style={[styles.bottomSheetTitle, { color: theme.text }]}>Send Quote</Text>
+                <Text style={[styles.bottomSheetSubtitle, { color: theme.textSecondary }]}>{sendQuoteModal?.quotationNumber}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setSendQuoteModal(null)}>
+                <X size={22} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <FieldLabel label="Total Amount (PHP) *" />
+              <TextInput
+                style={[styles.fieldInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
+                value={quoteData.totalAmount}
+                onChangeText={(v) => setQuoteData({ ...quoteData, totalAmount: v })}
+                placeholder="e.g. 25000"
+                placeholderTextColor={colors.gray[400]}
+                keyboardType="numeric"
+              />
+
+              <FieldLabel label="Valid for (days)" />
+              <TextInput
+                style={[styles.fieldInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
+                value={quoteData.validDays}
+                onChangeText={(v) => setQuoteData({ ...quoteData, validDays: v })}
+                keyboardType="numeric"
+                placeholderTextColor={colors.gray[400]}
+              />
+
+              <FieldLabel label="Terms & Conditions (optional)" />
+              <TextInput
+                style={[styles.fieldInput, styles.fieldTextarea, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
+                value={quoteData.terms}
+                onChangeText={(v) => setQuoteData({ ...quoteData, terms: v })}
+                placeholder="Payment terms, delivery notes..."
+                placeholderTextColor={colors.gray[400]}
+                multiline
+              />
+
+              <FieldLabel label="Admin Notes (optional)" />
+              <TextInput
+                style={[styles.fieldInput, styles.fieldTextarea, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
+                value={quoteData.adminNotes}
+                onChangeText={(v) => setQuoteData({ ...quoteData, adminNotes: v })}
+                placeholder="Internal notes visible to customer..."
+                placeholderTextColor={colors.gray[400]}
+                multiline
+              />
+
+              <View style={styles.sheetActions}>
+                <TouchableOpacity
+                  style={[styles.sheetCancelBtn, { borderColor: theme.border }]}
+                  onPress={() => setSendQuoteModal(null)}
+                >
+                  <Text style={[styles.sheetCancelText, { color: theme.text }]}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.sheetConfirmBtn, actionLoading === sendQuoteModal?._id && { opacity: 0.6 }]}
+                  onPress={handleSendQuote}
+                  disabled={!!actionLoading}
+                >
+                  {actionLoading === sendQuoteModal?._id
+                    ? <ActivityIndicator size="small" color="#fff" />
+                    : <>
+                        <Send size={16} color="#fff" />
+                        <Text style={styles.sheetConfirmText}>Send Quote</Text>
+                      </>
+                  }
+                </TouchableOpacity>
+              </View>
+              <View style={{ height: 16 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Reject Modal ── */}
+      <Modal visible={!!rejectModal} animationType="slide" transparent onRequestClose={() => setRejectModal(null)}>
+        <View style={styles.bottomSheetOverlay}>
+          <View style={[styles.bottomSheet, { backgroundColor: theme.surface }]}>
+            <View style={styles.bottomSheetHandle} />
+            <View style={styles.bottomSheetHeader}>
+              <View>
+                <Text style={[styles.bottomSheetTitle, { color: theme.text }]}>Reject Quotation</Text>
+                <Text style={[styles.bottomSheetSubtitle, { color: theme.textSecondary }]}>{rejectModal?.quotationNumber}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setRejectModal(null)}>
+                <X size={22} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <FieldLabel label="Reason for rejection (optional)" />
+            <TextInput
+              style={[styles.fieldInput, styles.fieldTextarea, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
+              value={rejectReason}
+              onChangeText={setRejectReason}
+              placeholder="Let the customer know why..."
+              placeholderTextColor={colors.gray[400]}
+              multiline
+            />
+
+            <View style={styles.sheetActions}>
+              <TouchableOpacity
+                style={[styles.sheetCancelBtn, { borderColor: theme.border }]}
+                onPress={() => setRejectModal(null)}
+              >
+                <Text style={[styles.sheetCancelText, { color: theme.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sheetRejectConfirmBtn, actionLoading === rejectModal?._id && { opacity: 0.6 }]}
+                onPress={handleRejectConfirm}
+                disabled={!!actionLoading}
+              >
+                {actionLoading === rejectModal?._id
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <>
+                      <XCircle size={16} color="#fff" />
+                      <Text style={styles.sheetConfirmText}>Confirm Reject</Text>
+                    </>
+                }
+              </TouchableOpacity>
+            </View>
+            <View style={{ height: 24 }} />
           </View>
         </View>
       </Modal>
@@ -320,154 +520,134 @@ export const AdminQuotationsScreen: React.FC = () => {
   );
 };
 
+/* ─── Small helper components ─── */
+const DetailRow: React.FC<{ label: string; value: string; last?: boolean; highlight?: boolean }> = ({ label, value, last, highlight }) => {
+  const { theme } = useTheme();
+  return (
+    <View style={[detailRowStyles.row, !last && { borderBottomWidth: 1, borderBottomColor: theme.border }]}>
+      <Text style={detailRowStyles.label}>{label}</Text>
+      <Text style={[detailRowStyles.value, { color: highlight ? colors.primary[600] : theme.text }, highlight && detailRowStyles.highlight]}>
+        {value}
+      </Text>
+    </View>
+  );
+};
+
+const FieldLabel: React.FC<{ label: string }> = ({ label }) => {
+  const { theme } = useTheme();
+  return <Text style={[fieldLabelStyles.label, { color: theme.textSecondary }]}>{label}</Text>;
+};
+
+const detailRowStyles = StyleSheet.create({
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14 },
+  label: { fontSize: 13, color: colors.gray[400], fontWeight: '500', flex: 1 },
+  value: { fontSize: 14, fontWeight: '500', flex: 2, textAlign: 'right' },
+  highlight: { fontWeight: '700', fontSize: 16, color: colors.primary[600] },
+});
+
+const fieldLabelStyles = StyleSheet.create({
+  label: { fontSize: 13, fontWeight: '600', color: colors.gray[500], marginBottom: 6, marginTop: 14 },
+});
+
+/* ─── Main styles ─── */
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.gray[50],
-  },
-  searchContainer: {
-    padding: 16,
-    backgroundColor: colors.white,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.gray[100],
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  searchInput: {
-    flex: 1,
-    marginLeft: 8,
-    fontSize: 15,
-    color: colors.gray[900],
-  },
-  filterContainer: {
-    backgroundColor: colors.white,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[200],
-  },
-  listContent: {
-    padding: 16,
-    flexGrow: 1,
-  },
-  quotationCard: {
+  container: { flex: 1 },
+
+  // Search
+  searchContainer: { padding: 12, borderBottomWidth: 1 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, gap: 8 },
+  searchInput: { flex: 1, fontSize: 14 },
+
+  // Filters
+  filterContainer: { paddingVertical: 10, borderBottomWidth: 1 },
+
+  // List
+  listContent: { padding: 16, flexGrow: 1 },
+
+  // Card
+  card: {
+    borderRadius: 14,
     marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+    overflow: 'hidden',
   },
-  quotationHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  quotationInfo: {},
-  quotationNumber: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.gray[900],
-  },
-  quotationDate: {
-    fontSize: 13,
-    color: colors.gray[500],
-    marginTop: 2,
-  },
-  itemsSection: {
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.gray[100],
-  },
-  itemsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
-  },
-  itemsCount: {
-    fontSize: 14,
-    color: colors.gray[600],
-  },
-  itemName: {
-    fontSize: 13,
-    color: colors.gray[500],
-    marginBottom: 2,
-  },
-  moreItems: {
-    fontSize: 12,
-    color: colors.primary[600],
-    fontWeight: '500',
-    marginTop: 4,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.gray[100],
-  },
-  actionButton: {
-    flex: 1,
-  },
-  approvedInfo: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.gray[100],
-    backgroundColor: colors.success + '10',
-    marginHorizontal: -16,
-    marginBottom: -16,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
+    padding: 14,
   },
-  approvedLabel: {
-    fontSize: 14,
-    color: colors.gray[600],
-  },
-  approvedAmount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.success,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  modalContent: {
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: 24,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: colors.gray[900],
-    marginBottom: 4,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: colors.gray[500],
-    marginBottom: 20,
-  },
-  inputSpacing: {
-    marginTop: 12,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 24,
-  },
-  modalButton: {
-    flex: 1,
-  },
+  cardHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  cardIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  cardQNumber: { fontSize: 15, fontWeight: '700' },
+  cardDate: { fontSize: 12, marginTop: 1 },
+
+  // Customer row
+  customerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 14, paddingBottom: 10, borderTopWidth: 1 },
+  customerItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  customerText: { fontSize: 13 },
+
+  // Items row
+  itemsRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: 1 },
+  itemsCount: { fontSize: 13, fontWeight: '600', minWidth: 50 },
+  itemsPreview: { fontSize: 13, flex: 1 },
+
+  // Amount row
+  amountRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: 1 },
+  amountLabel: { fontSize: 13 },
+  amountValue: { fontSize: 16, fontWeight: '700', color: colors.primary[600] },
+
+  // Card footer
+  cardFooter: { flexDirection: 'row', gap: 8, padding: 12, borderTopWidth: 1 },
+  footerBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, borderRadius: 8 },
+  footerBtnText: { fontSize: 13, fontWeight: '600' },
+  viewBtn: { borderWidth: 1 },
+  sendBtn: { backgroundColor: colors.primary[600] },
+  sendBtnText: { fontSize: 13, fontWeight: '600', color: '#fff' },
+  rejectBtn: { borderWidth: 1, borderColor: '#fca5a5', backgroundColor: '#fff1f2' },
+  rejectBtnText: { fontSize: 13, fontWeight: '600', color: '#dc2626' },
+
+  // Detail modal
+  modalSheet: { flex: 1 },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
+  modalTitle: { fontSize: 18, fontWeight: '700' },
+  modalCloseBtn: { padding: 4 },
+  modalBody: { padding: 16 },
+  detailStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  detailQNumber: { fontSize: 14 },
+  detailCard: { borderRadius: 12, borderWidth: 1, marginBottom: 16, overflow: 'hidden' },
+  detailSectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 8, marginTop: 4 },
+  itemRow: { flexDirection: 'row', alignItems: 'flex-start', padding: 12, gap: 10 },
+  itemDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary[400], marginTop: 6 },
+  itemRowName: { fontSize: 14, fontWeight: '600' },
+  itemRowQty: { fontSize: 13, marginTop: 2 },
+  itemRowSpec: { fontSize: 12, marginTop: 2, fontStyle: 'italic' },
+  notesText: { fontSize: 14, lineHeight: 22, padding: 14 },
+  detailActions: { flexDirection: 'row', gap: 10, marginTop: 4, marginBottom: 8 },
+  detailSendBtn: { flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 13, borderRadius: 10, backgroundColor: colors.primary[600] },
+  detailSendText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  detailRejectBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 13, borderRadius: 10, borderWidth: 1, borderColor: '#fca5a5', backgroundColor: '#fff1f2' },
+  detailRejectText: { fontSize: 15, fontWeight: '600', color: '#dc2626' },
+
+  // Bottom sheets (Send Quote & Reject)
+  bottomSheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  bottomSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '90%' },
+  bottomSheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.gray[300], alignSelf: 'center', marginBottom: 16 },
+  bottomSheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
+  bottomSheetTitle: { fontSize: 18, fontWeight: '700' },
+  bottomSheetSubtitle: { fontSize: 13, marginTop: 2 },
+  fieldInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, marginBottom: 4 },
+  fieldTextarea: { minHeight: 80, textAlignVertical: 'top' },
+  sheetActions: { flexDirection: 'row', gap: 10, marginTop: 20 },
+  sheetCancelBtn: { flex: 1, paddingVertical: 13, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
+  sheetCancelText: { fontSize: 14, fontWeight: '600' },
+  sheetConfirmBtn: { flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 13, borderRadius: 10, backgroundColor: colors.primary[600] },
+  sheetRejectConfirmBtn: { flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 13, borderRadius: 10, backgroundColor: '#dc2626' },
+  sheetConfirmText: { fontSize: 14, fontWeight: '700', color: '#fff' },
 });
 
 export default AdminQuotationsScreen;
