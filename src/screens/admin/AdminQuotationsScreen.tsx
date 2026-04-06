@@ -288,7 +288,9 @@ export const AdminQuotationsScreen: React.FC = () => {
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={
-          <EmptyState icon="file" title="No Quotations Found" description="There are no quotations to display." />
+          refreshing
+            ? <View style={styles.centerLoader}><ActivityIndicator size="large" color={colors.primary[600]} /><Text style={styles.centerLoaderText}>Loading quotations...</Text></View>
+            : <EmptyState icon="file" title="No Quotations Found" description="There are no quotations to display." />
         }
         showsVerticalScrollIndicator={false}
       />
@@ -556,6 +558,8 @@ const styles = StyleSheet.create({
 
   // List
   listContent: { padding: 16, flexGrow: 1 },
+  centerLoader: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 12 },
+  centerLoaderText: { fontSize: 14, color: colors.gray[500] },
 
   // Card
   card: {

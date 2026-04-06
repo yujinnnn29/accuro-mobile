@@ -70,8 +70,8 @@ function formatDate(dateStr: string) {
 export const AdminBookingsScreen: React.FC = () => {
   const { theme } = useTheme();
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState<FilterKey>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -195,7 +195,6 @@ export const AdminBookingsScreen: React.FC = () => {
         : bookings.filter((b) => b.status === opt.key).length,
     }));
 
-  if (loading) return <LoadingSpinner fullScreen text="Loading bookings..." />;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['bottom']}>
@@ -234,11 +233,13 @@ export const AdminBookingsScreen: React.FC = () => {
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={
-          <EmptyState
-            icon="calendar"
-            title="No Bookings Found"
-            description={searchQuery ? 'No bookings match your search.' : 'There are no bookings to display.'}
-          />
+          refreshing && bookings.length === 0
+            ? <View style={styles.centerLoader}><ActivityIndicator size="large" color={colors.primary[600]} /><Text style={styles.centerLoaderText}>Loading bookings...</Text></View>
+            : <EmptyState
+                icon="calendar"
+                title="No Bookings Found"
+                description={searchQuery ? 'No bookings match your search.' : 'There are no bookings to display.'}
+              />
         }
         showsVerticalScrollIndicator={false}
         renderItem={({ item }) => (
@@ -504,6 +505,8 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.gray[200],
   },
   listContent: { padding: 16, flexGrow: 1 },
+  centerLoader: { flex: 1, alignItems: 'center' as const, justifyContent: 'center' as const, paddingTop: 80, gap: 12 },
+  centerLoaderText: { fontSize: 14, color: colors.gray[500] },
 
   // List card
   card: {
