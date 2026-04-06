@@ -381,7 +381,7 @@ export const AdminQuotationsScreen: React.FC = () => {
               {(detailModal.status === 'pending' || detailModal.status === 'declined') && (
                 <View style={styles.detailActions}>
                   <TouchableOpacity
-                    style={[styles.detailSendBtn, actionLoading === detailModal._id && { opacity: 0.6 }]}
+                    style={[styles.detailSendBtn, detailModal.status === 'declined' && { backgroundColor: '#EA580C' }, actionLoading === detailModal._id && { opacity: 0.6 }]}
                     onPress={() => { setDetailModal(null); setQuoteData({ totalAmount: '', validDays: '30', terms: '', adminNotes: '' }); setSendQuoteModal(detailModal); }}
                   >
                     <Send size={16} color="#fff" />
