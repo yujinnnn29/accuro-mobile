@@ -27,7 +27,7 @@ import {
   Send,
 } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { TechnicianTabParamList } from '../../navigation/types';
 import { bookingService } from '../../api/bookingService';
 import { Booking } from '../../types';
@@ -202,14 +202,12 @@ export const TechnicianAssignmentsScreen: React.FC = () => {
       }
     }).catch(() => {});
     fetchAssignments();
-  }, [fetchAssignments]);
-
-  // Refresh every time this screen comes into focus so stale cache never shows wrong buttons
-  useFocusEffect(
-    React.useCallback(() => {
+    // Refresh when screen comes back into focus (no extra hook needed)
+    const unsubscribe = (navigation as any).addListener('focus', () => {
       fetchAssignments();
-    }, [fetchAssignments])
-  );
+    });
+    return unsubscribe;
+  }, [fetchAssignments, navigation]);
 
   // Auto-open report modal when navigated from dashboard with a submitBookingId
   useEffect(() => {
