@@ -27,7 +27,7 @@ import {
   Send,
 } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { TechnicianTabParamList } from '../../navigation/types';
 import { bookingService } from '../../api/bookingService';
 import { Booking } from '../../types';
@@ -204,6 +204,13 @@ export const TechnicianAssignmentsScreen: React.FC = () => {
     fetchAssignments();
   }, [fetchAssignments]);
 
+  // Refresh every time this screen comes into focus so stale cache never shows wrong buttons
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchAssignments();
+    }, [fetchAssignments])
+  );
+
   // Auto-open report modal when navigated from dashboard with a submitBookingId
   useEffect(() => {
     if (submitBookingId && assignments.length > 0) {
@@ -224,7 +231,13 @@ export const TechnicianAssignmentsScreen: React.FC = () => {
       Alert.alert('Success', 'Meeting started successfully');
       fetchAssignments();
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to start meeting');
+      const msg: string = error.response?.data?.message || '';
+      if (msg.toLowerCase().includes('in_progress') || msg.toLowerCase().includes('already')) {
+        // Booking already started — just refresh so UI reflects server state
+        fetchAssignments();
+      } else {
+        Alert.alert('Error', msg || 'Failed to start meeting');
+      }
     } finally {
       setActionLoading(null);
     }
