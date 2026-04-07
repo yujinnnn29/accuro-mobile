@@ -94,27 +94,36 @@ export const NotificationsScreen: React.FC = () => {
     if (!notification.isRead) {
       handleMarkAsRead(notification._id);
     }
-    // Navigate based on link
-    const { type, id } = parseLinkId(notification.link);
+
+    // Determine type from notification.type first, then fall back to link parsing
+    const { type: linkType, id } = parseLinkId(notification.link);
+    const resolvedType = notification.type === 'booking' || notification.type === 'quotation'
+      ? notification.type
+      : linkType;
+
     if (isAdmin) {
-      // Admin context — navigate within admin drawer
-      if (type === 'booking') {
-        navigation.navigate('AdminBookings');
-      } else if (type === 'quotation') {
-        navigation.navigate('AdminQuotations');
+      // Admin — navigate to the relevant module in the drawer
+      if (resolvedType === 'booking') {
+        navigation.navigate('AdminBookings' as never);
+      } else if (resolvedType === 'quotation') {
+        navigation.navigate('AdminQuotations' as never);
       }
     } else {
-      // User context — navigate within tab navigator
-      if (type === 'booking' && id) {
+      // User — navigate into the relevant tab/screen
+      if (resolvedType === 'booking' && id) {
         navigation.getParent()?.navigate('BookingsTab', {
           screen: 'BookingDetail',
           params: { bookingId: id },
         });
-      } else if (type === 'quotation' && id) {
+      } else if (resolvedType === 'booking') {
+        navigation.getParent()?.navigate('BookingsTab', { screen: 'MyBookings' });
+      } else if (resolvedType === 'quotation' && id) {
         navigation.getParent()?.navigate('MoreTab', {
           screen: 'QuotationDetail',
           params: { quotationId: id },
         });
+      } else if (resolvedType === 'quotation') {
+        navigation.getParent()?.navigate('MoreTab', { screen: 'MyQuotations' });
       }
     }
   };
