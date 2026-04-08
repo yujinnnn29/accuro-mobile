@@ -82,6 +82,13 @@ export type TechnicianStackParamList = {
   TechnicianProfile: undefined;
 };
 
+// Technician Drawer Navigator
+export type TechnicianDrawerParamList = {
+  TechnicianDashboard: undefined;
+  TechnicianAssignments: { submitBookingId?: string } | undefined;
+  TechnicianNotifications: undefined;
+};
+
 // Admin Navigator
 export type AdminDrawerParamList = {
   AdminDashboard: undefined;

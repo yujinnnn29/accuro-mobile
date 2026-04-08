@@ -28,9 +28,10 @@ import {
 } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { TechnicianTabParamList } from '../../navigation/types';
+import { TechnicianDrawerParamList } from '../../navigation/types';
 import { bookingService } from '../../api/bookingService';
 import { Booking } from '../../types';
+import { useTheme } from '../../contexts';
 
 const CACHE_KEY = 'technician_assignments_cache';
 import { colors } from '../../theme';
@@ -168,8 +169,9 @@ const ReportModal: React.FC<ReportModalProps> = ({ visible, booking, onClose, on
 
 export const TechnicianAssignmentsScreen: React.FC = () => {
   const navigation = useNavigation();
-  const route = useRoute<RouteProp<TechnicianTabParamList, 'TechnicianAssignmentsTab'>>();
+  const route = useRoute<RouteProp<TechnicianDrawerParamList, 'TechnicianAssignments'>>();
   const submitBookingId = route.params?.submitBookingId;
+  const { theme } = useTheme();
 
   const [assignments, setAssignments] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -288,8 +290,33 @@ export const TechnicianAssignmentsScreen: React.FC = () => {
     }
   }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
+  const todayCount = assignments.filter(a => isToday(a.date)).length;
+  const upcomingCount = assignments.filter(a => isUpcoming(a.date) && ['confirmed', 'in_progress'].includes(a.status)).length;
   const pendingCount = assignments.filter(a => a.status === 'confirmed' || a.status === 'in_progress').length;
   const reviewCount = assignments.filter(a => a.status === 'pending_review').length;
+  const completedCount = assignments.filter(a => a.status === 'completed').length;
+  const allCount = assignments.length;
+
+  const TAB_BADGE_COLORS: Record<string, string> = {
+    today: '#2563eb',
+    upcoming: '#0891b2',
+    pending_completion: '#f97316',
+    pending_review: '#7c3aed',
+    completed: '#15803d',
+    all: '#6b7280',
+  };
+
+  const getTabCount = (key: string): number => {
+    switch (key) {
+      case 'today': return todayCount;
+      case 'upcoming': return upcomingCount;
+      case 'pending_completion': return pendingCount;
+      case 'pending_review': return reviewCount;
+      case 'completed': return completedCount;
+      case 'all': return allCount;
+      default: return 0;
+    }
+  };
 
   const renderStatusBadge = (status: string) => {
     const s = STATUS_COLORS[status] || { bg: colors.gray[100], text: colors.gray[600], label: status };
@@ -301,11 +328,11 @@ export const TechnicianAssignmentsScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <Text style={styles.headerTitle}>My Assignments</Text>
+          <Text style={styles.headerSub}>Manage your bookings and service reports</Text>
           <TouchableOpacity
             onPress={handleRefresh}
             disabled={loading || refreshing}
@@ -314,23 +341,24 @@ export const TechnicianAssignmentsScreen: React.FC = () => {
             <RefreshCw size={16} color="#fff" />
           </TouchableOpacity>
         </View>
-        <Text style={styles.headerSub}>Manage your bookings and service reports</Text>
       </View>
 
       {/* Filter Tabs */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsContainer} contentContainerStyle={styles.tabsContent}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.tabsContainer, { backgroundColor: theme.surface, borderBottomColor: theme.border }]} contentContainerStyle={styles.tabsContent}>
         {FILTER_TABS.map(tab => (
           <TouchableOpacity
             key={tab.key}
-            style={[styles.tab, activeTab === tab.key && styles.activeTab]}
+            style={[styles.tab, { backgroundColor: theme.background, borderColor: theme.border }, activeTab === tab.key && styles.activeTab]}
             onPress={() => setActiveTab(tab.key)}
           >
-            <Text style={[styles.tabText, activeTab === tab.key && styles.activeTabText]}>{tab.label}</Text>
-            {tab.key === 'pending_completion' && pendingCount > 0 && (
-              <View style={styles.tabBadge}><Text style={styles.tabBadgeText}>{pendingCount}</Text></View>
-            )}
-            {tab.key === 'pending_review' && reviewCount > 0 && (
-              <View style={[styles.tabBadge, { backgroundColor: '#7c3aed' }]}><Text style={styles.tabBadgeText}>{reviewCount}</Text></View>
+            <Text style={[styles.tabText, { color: theme.textSecondary }, activeTab === tab.key && styles.activeTabText]}>{tab.label}</Text>
+            {getTabCount(tab.key) > 0 && (
+              <View style={[
+                styles.tabBadge,
+                { backgroundColor: activeTab === tab.key ? 'rgba(255,255,255,0.3)' : TAB_BADGE_COLORS[tab.key] },
+              ]}>
+                <Text style={styles.tabBadgeText}>{getTabCount(tab.key)}</Text>
+              </View>
             )}
           </TouchableOpacity>
         ))}
@@ -342,27 +370,27 @@ export const TechnicianAssignmentsScreen: React.FC = () => {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
         {loading ? (
-          <Text style={styles.loadingText}>Loading assignments...</Text>
+          <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Loading assignments...</Text>
         ) : filteredAssignments.length === 0 ? (
           <View style={styles.emptyState}>
             <Calendar size={48} color={colors.gray[300]} />
-            <Text style={styles.emptyTitle}>{EMPTY_MESSAGES[activeTab].title}</Text>
-            <Text style={styles.emptySub}>{EMPTY_MESSAGES[activeTab].subtitle}</Text>
+            <Text style={[styles.emptyTitle, { color: theme.textSecondary }]}>{EMPTY_MESSAGES[activeTab].title}</Text>
+            <Text style={[styles.emptySub, { color: colors.gray[400] }]}>{EMPTY_MESSAGES[activeTab].subtitle}</Text>
           </View>
         ) : (
           <View style={styles.listContent}>
             {filteredAssignments.map(booking => {
               const isExpanded = expandedBooking === booking._id;
               return (
-                <View key={booking._id} style={styles.card}>
+                <View key={booking._id} style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                   {/* Card Top */}
                   <View style={styles.cardTop}>
                     <View style={styles.cardTopLeft}>
                       <View style={styles.cardTitleRow}>
-                        <Text style={styles.cardName}>{booking.contactName}</Text>
+                        <Text style={[styles.cardName, { color: theme.text }]}>{booking.contactName}</Text>
                         {renderStatusBadge(booking.status)}
                       </View>
-                      <Text style={styles.cardDate}>
+                      <Text style={[styles.cardDate, { color: theme.textSecondary }]}>
                         {formatDate(booking.date)} at {formatTime(booking.time)}
                       </Text>
                     </View>
@@ -371,32 +399,32 @@ export const TechnicianAssignmentsScreen: React.FC = () => {
                       style={styles.expandBtn}
                     >
                       {isExpanded
-                        ? <ChevronUp size={18} color={colors.gray[400]} />
-                        : <ChevronDown size={18} color={colors.gray[400]} />
+                        ? <ChevronUp size={18} color={theme.textSecondary} />
+                        : <ChevronDown size={18} color={theme.textSecondary} />
                       }
                     </TouchableOpacity>
                   </View>
 
                   {/* Quick Details */}
                   <View style={styles.quickDetails}>
-                    {!!booking.company && <View style={styles.detailItem}><Building size={12} color={colors.gray[400]} /><Text style={styles.detailText} numberOfLines={1}>{booking.company}</Text></View>}
-                    {!!booking.location && <View style={styles.detailItem}><MapPin size={12} color={colors.gray[400]} /><Text style={styles.detailText} numberOfLines={1}>{booking.location}</Text></View>}
-                    {!!booking.product && <View style={styles.detailItem}><Package size={12} color={colors.gray[400]} /><Text style={styles.detailText} numberOfLines={1}>{booking.product}</Text></View>}
+                    {!!booking.company && <View style={styles.detailItem}><Building size={12} color={colors.gray[400]} /><Text style={[styles.detailText, { color: theme.textSecondary }]} numberOfLines={1}>{booking.company}</Text></View>}
+                    {!!booking.location && <View style={styles.detailItem}><MapPin size={12} color={colors.gray[400]} /><Text style={[styles.detailText, { color: theme.textSecondary }]} numberOfLines={1}>{booking.location}</Text></View>}
+                    {!!booking.product && <View style={styles.detailItem}><Package size={12} color={colors.gray[400]} /><Text style={[styles.detailText, { color: theme.textSecondary }]} numberOfLines={1}>{booking.product}</Text></View>}
                   </View>
 
                   {/* Expanded Details */}
                   {isExpanded && (
-                    <View style={styles.expandedDetails}>
+                    <View style={[styles.expandedDetails, { borderTopColor: theme.border }]}>
                       <View style={styles.expandedItem}>
                         <FileText size={12} color={colors.gray[400]} />
-                        <Text style={styles.expandedLabel}>Purpose: </Text>
-                        <Text style={styles.expandedValue}>{booking.purpose}</Text>
+                        <Text style={[styles.expandedLabel, { color: theme.text }]}>Purpose: </Text>
+                        <Text style={[styles.expandedValue, { color: theme.textSecondary }]}>{booking.purpose}</Text>
                       </View>
                       {booking.additionalInfo ? (
                         <View style={styles.expandedItem}>
                           <Info size={12} color={colors.gray[400]} />
-                          <Text style={styles.expandedLabel}>Notes: </Text>
-                          <Text style={styles.expandedValue}>{booking.additionalInfo}</Text>
+                          <Text style={[styles.expandedLabel, { color: theme.text }]}>Notes: </Text>
+                          <Text style={[styles.expandedValue, { color: theme.textSecondary }]}>{booking.additionalInfo}</Text>
                         </View>
                       ) : null}
                     </View>
@@ -458,15 +486,14 @@ export const TechnicianAssignmentsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.gray[50] },
   header: {
-    backgroundColor: '#1e3a5f',
+    backgroundColor: '#001F3F',
     paddingHorizontal: 16,
-    paddingTop: 50,
-    paddingBottom: 16,
+    paddingTop: 14,
+    paddingBottom: 14,
   },
-  headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#fff' },
+  headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   refreshBtn: { padding: 6, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 8 },
-  headerSub: { color: '#9ca3af', fontSize: 13 },
+  headerSub: { color: '#93c5fd', fontSize: 13, flex: 1 },
   tabsContainer: { maxHeight: 52, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: colors.gray[200] },
   tabsContent: { paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
   tab: {

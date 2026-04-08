@@ -22,6 +22,7 @@ import {
   Activity,
   Moon,
   House,
+  Wrench,
 } from 'lucide-react-native';
 import { useAuth, useTheme } from '../../contexts';
 import { colors } from '../../theme';
@@ -45,12 +46,15 @@ interface MenuItem {
 
 export const MoreMenuScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, isTechnician } = useAuth();
   const { theme, isDark, toggleTheme } = useTheme();
 
   const handleAdminDashboard = () => {
-    // Navigate to admin panel using the root navigator
     navigation.getParent()?.getParent()?.navigate('AdminPanel' as never);
+  };
+
+  const handleTechnicianDashboard = () => {
+    navigation.getParent()?.getParent()?.navigate('TechnicianPanel' as never);
   };
 
   const menuItems: MenuItem[] = [
@@ -128,7 +132,7 @@ export const MoreMenuScreen: React.FC = () => {
             <Text style={[styles.profileName, { color: theme.text }]}>{user?.name}</Text>
             <Text style={[styles.profileEmail, { color: theme.textSecondary }]}>{user?.email}</Text>
             <Badge
-              label={user?.role === 'superadmin' ? 'Super Admin' : user?.role === 'admin' ? 'Admin' : 'User'}
+              label={user?.role === 'superadmin' ? 'Super Admin' : user?.role === 'admin' ? 'Admin' : user?.role === 'technician' ? 'Technician' : 'User'}
               variant="info"
               size="sm"
               style={styles.roleBadge}
@@ -154,6 +158,31 @@ export const MoreMenuScreen: React.FC = () => {
                   <Text style={[styles.menuLabel, { color: theme.text }]}>Admin Dashboard</Text>
                   <Text style={[styles.menuDescription, { color: theme.textSecondary }]}>
                     Manage bookings, products, users & more
+                  </Text>
+                </View>
+                <ChevronRight size={18} color={colors.gray[400]} />
+              </TouchableOpacity>
+            </Card>
+          </View>
+        )}
+
+        {/* Technician Dashboard - Only visible for technician users */}
+        {isTechnician && (
+          <View style={styles.adminSection}>
+            <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>Technician</Text>
+            <Card padding="none" style={styles.menuCard}>
+              <TouchableOpacity
+                style={[styles.adminMenuItem, { backgroundColor: theme.surface }]}
+                onPress={handleTechnicianDashboard}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.adminIconContainer, { backgroundColor: '#059669' }]}>
+                  <Wrench size={22} color={colors.white} />
+                </View>
+                <View style={styles.menuContent}>
+                  <Text style={[styles.menuLabel, { color: theme.text }]}>Technician Dashboard</Text>
+                  <Text style={[styles.menuDescription, { color: theme.textSecondary }]}>
+                    View assignments, reports & notifications
                   </Text>
                 </View>
                 <ChevronRight size={18} color={colors.gray[400]} />

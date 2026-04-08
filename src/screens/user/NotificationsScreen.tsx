@@ -51,8 +51,17 @@ export const NotificationsScreen: React.FC = () => {
       const response = await notificationService.getNotifications();
       setNotifications(response.data || []);
       refreshUnreadCount();
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
+    } catch (error: any) {
+      const isNetworkIssue = !error.response && (
+        error.name === 'AbortError' ||
+        error.code === 'ERR_CANCELED' ||
+        error.code === 'ERR_NETWORK' ||
+        error.message === 'Aborted' ||
+        error.message === 'Network Error'
+      );
+      if (!isNetworkIssue) {
+        console.error('Error fetching notifications:', error);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
