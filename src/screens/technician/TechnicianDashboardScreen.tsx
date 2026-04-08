@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -59,6 +60,7 @@ export const TechnicianDashboardScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const fetchAssignments = useCallback(async () => {
     try {
@@ -87,6 +89,7 @@ export const TechnicianDashboardScreen: React.FC = () => {
     try {
       setActionLoading(id);
       await bookingService.startBooking(id);
+      setShowSuccessModal(true);
       fetchAssignments();
     } catch (error: any) {
       const { Alert } = require('react-native');
@@ -312,6 +315,24 @@ export const TechnicianDashboardScreen: React.FC = () => {
 
         <View style={styles.bottomPadding} />
       </ScrollView>
+
+      {/* Meeting Started Success Modal */}
+      <Modal visible={showSuccessModal} transparent animationType="fade">
+        <View style={styles.successOverlay}>
+          <View style={[styles.successModal, { backgroundColor: theme.surface }]}>
+            <View style={styles.successIconWrap}>
+              <CheckCircle size={48} color="#059669" />
+            </View>
+            <Text style={[styles.successTitle, { color: theme.text }]}>Meeting Started!</Text>
+            <Text style={[styles.successMessage, { color: theme.textSecondary }]}>
+              The meeting is now in progress. Submit a report once you're done.
+            </Text>
+            <TouchableOpacity style={styles.successBtn} onPress={() => setShowSuccessModal(false)}>
+              <Text style={styles.successBtnText}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -409,6 +430,28 @@ const styles = StyleSheet.create({
   quickActionText: { flex: 1, fontSize: 15, fontWeight: '500' },
 
   bottomPadding: { height: 32 },
+
+  // Success modal
+  successOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32,
+  },
+  successModal: {
+    width: '100%', borderRadius: 20, padding: 28, alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15, shadowRadius: 16, elevation: 8,
+  },
+  successIconWrap: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: '#d1fae5', alignItems: 'center', justifyContent: 'center', marginBottom: 16,
+  },
+  successTitle: { fontSize: 20, fontWeight: '700', marginBottom: 8, textAlign: 'center' },
+  successMessage: { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+  successBtn: {
+    backgroundColor: '#059669', paddingVertical: 12,
+    paddingHorizontal: 40, borderRadius: 10, width: '100%', alignItems: 'center',
+  },
+  successBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
 });
 
 export default TechnicianDashboardScreen;
