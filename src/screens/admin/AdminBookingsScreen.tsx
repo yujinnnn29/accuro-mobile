@@ -95,7 +95,13 @@ export const AdminBookingsScreen: React.FC = () => {
   const fetchBookings = useCallback(async () => {
     try {
       const response = await bookingService.getAll();
-      setBookings(response.data || []);
+      const data: Booking[] = response.data || [];
+      data.sort((a: any, b: any) => {
+        const aTime = new Date(a.createdAt || a.date || 0).getTime();
+        const bTime = new Date(b.createdAt || b.date || 0).getTime();
+        return bTime - aTime;
+      });
+      setBookings(data);
     } catch (error: any) {
       const isNetworkIssue = !error.response && (
         error.name === 'AbortError' ||

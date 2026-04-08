@@ -141,9 +141,17 @@ export const QuotationDetailScreen: React.FC = () => {
     }
   };
 
+  const isQuotationExpired = (q: Quotation) => {
+    if (q.status === 'expired') return true;
+    if (q.status === 'quoted' && (q as any).validUntil && new Date((q as any).validUntil) < new Date()) return true;
+    return false;
+  };
+
   const statusStyle = STATUS_STYLES[quotation.status] || STATUS_STYLES.pending;
   const isAccepted = quotation.status === 'accepted' || quotation.status === 'approved';
   const isQuoted = quotation.status === 'quoted';
+  const isExpired = isQuotationExpired(quotation);
+  const canAccept = isQuoted && !isExpired;
   const isDeclined = quotation.status === 'declined';
   const isRejected = quotation.status === 'rejected';
 
@@ -211,10 +219,18 @@ export const QuotationDetailScreen: React.FC = () => {
           ))}
         </View>
 
+        {/* Expired notice */}
+        {isQuoted && isExpired && (
+          <View style={styles.expiredCard}>
+            <Text style={styles.expiredTitle}>Quotation Expired</Text>
+            <Text style={styles.expiredText}>This quotation has expired and can no longer be accepted. Please request a new quotation if you're still interested.</Text>
+          </View>
+        )}
+
         {/* Quote Sent — Accept/Decline Actions */}
         {isQuoted && (
           <View style={styles.quotedCard}>
-            <Text style={styles.quotedTitle}>Quote Prepared — Your Action Needed</Text>
+            <Text style={styles.quotedTitle}>{canAccept ? 'Quote Prepared — Your Action Needed' : 'Quote Details'}</Text>
 
             {quotation.totalAmount != null && (
               <>
@@ -259,16 +275,18 @@ export const QuotationDetailScreen: React.FC = () => {
                 <ThumbsDown size={16} color="#dc2626" />
                 <Text style={styles.declineBtnText}>Decline</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.acceptBtn, actionLoading === 'accept' && { opacity: 0.6 }]}
-                onPress={handleAccept}
-                disabled={!!actionLoading}
-              >
-                <ThumbsUp size={16} color="#fff" />
-                <Text style={styles.acceptBtnText}>
-                  {actionLoading === 'accept' ? 'Accepting...' : 'Accept Quotation'}
-                </Text>
-              </TouchableOpacity>
+              {canAccept && (
+                <TouchableOpacity
+                  style={[styles.acceptBtn, actionLoading === 'accept' && { opacity: 0.6 }]}
+                  onPress={handleAccept}
+                  disabled={!!actionLoading}
+                >
+                  <ThumbsUp size={16} color="#fff" />
+                  <Text style={styles.acceptBtnText}>
+                    {actionLoading === 'accept' ? 'Accepting...' : 'Accept Quotation'}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         )}
@@ -453,6 +471,26 @@ const styles = StyleSheet.create({
   itemName: { fontSize: 15, fontWeight: '600', marginBottom: 4 },
   itemQty: { fontSize: 13 },
   itemSpec: { fontSize: 13, marginTop: 4, fontStyle: 'italic' },
+
+  // Expired card (gray)
+  expiredCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#F9FAFB',
+    padding: 16,
+  },
+  expiredTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#374151',
+    marginBottom: 6,
+  },
+  expiredText: {
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 20,
+  },
 
   // Quoted card (blue — action needed)
   quotedCard: {

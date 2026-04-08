@@ -97,7 +97,18 @@ const MyQuotationsScreen: React.FC = () => {
     navigation.navigate('QuotationDetail', { quotationId: quotation._id, quotation });
   };
 
-  const handleAccept = (quotationId: string) => {
+  const isQuotationExpired = (q: Quotation) => {
+    if (q.status === 'expired') return true;
+    if (q.status === 'quoted' && (q as any).validUntil && new Date((q as any).validUntil) < new Date()) return true;
+    return false;
+  };
+
+  const handleAccept = (quotation: Quotation) => {
+    if (isQuotationExpired(quotation)) {
+      Alert.alert('Quotation Expired', 'This quotation has expired and can no longer be accepted.');
+      return;
+    }
+    const quotationId = quotation._id;
     Alert.alert(
       'Accept Quotation',
       'Are you sure you want to accept this quotation?',
@@ -169,6 +180,8 @@ const MyQuotationsScreen: React.FC = () => {
 
   const renderQuotation = ({ item }: { item: Quotation }) => {
     const isQuoted = item.status === 'quoted';
+    const isExpired = isQuotationExpired(item);
+    const canAccept = isQuoted && !isExpired;
     const isAccepted = item.status === 'accepted' || item.status === 'approved';
     const isActioning = actionLoading === item._id;
 
@@ -178,6 +191,12 @@ const MyQuotationsScreen: React.FC = () => {
           quotation={item}
           onPress={() => handleQuotationPress(item)}
         />
+        {/* Expired notice for quoted-but-expired quotations */}
+        {isQuoted && isExpired && (
+          <View style={styles.expiredBanner}>
+            <Text style={styles.expiredBannerText}>This quotation has expired and can no longer be accepted.</Text>
+          </View>
+        )}
         {/* Inline actions for quoted status */}
         {isQuoted && (
           <View style={styles.inlineActions}>
@@ -193,18 +212,20 @@ const MyQuotationsScreen: React.FC = () => {
               )}
               <Text style={styles.declineBtnText}>Decline</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.acceptBtn, isActioning && { opacity: 0.6 }]}
-              onPress={() => handleAccept(item._id)}
-              disabled={!!actionLoading}
-            >
-              {isActioning ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <ThumbsUp size={14} color="#fff" />
-              )}
-              <Text style={styles.acceptBtnText}>Accept</Text>
-            </TouchableOpacity>
+            {canAccept && (
+              <TouchableOpacity
+                style={[styles.acceptBtn, isActioning && { opacity: 0.6 }]}
+                onPress={() => handleAccept(item)}
+                disabled={!!actionLoading}
+              >
+                {isActioning ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <ThumbsUp size={14} color="#fff" />
+                )}
+                <Text style={styles.acceptBtnText}>Accept</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
         {/* Book a Meeting for accepted quotations */}
@@ -384,6 +405,23 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 16,
     flexGrow: 1,
+  },
+  // Expired banner
+  expiredBanner: {
+    marginTop: -4,
+    marginBottom: 4,
+    marginHorizontal: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  expiredBannerText: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontStyle: 'italic',
   },
   // Inline actions
   inlineActions: {
