@@ -5,7 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { CommonActions } from '@react-navigation/native';
 import { Home, Calendar, ClipboardList, Bell, Menu } from 'lucide-react-native';
 import { colors } from '../theme';
-import { useNotifications } from '../contexts';
+import { useNotifications, useTheme } from '../contexts';
 import {
   MainTabParamList,
   HomeStackParamList,
@@ -98,6 +98,7 @@ const MoreStackNavigator: React.FC = () => {
 // User Tab Navigator
 const UserTabNavigator: React.FC = () => {
   const { unreadCount } = useNotifications();
+  const { theme } = useTheme();
 
   return (
     <Tab.Navigator
@@ -114,7 +115,7 @@ const UserTabNavigator: React.FC = () => {
               return <ClipboardList size={iconSize} color={color} />;
             case 'NotificationsTab':
               return (
-                <View>
+                <View style={tabStyles.iconWrapper}>
                   <Bell size={iconSize} color={color} />
                   {unreadCount > 0 && (
                     <View style={tabStyles.badge}>
@@ -134,8 +135,8 @@ const UserTabNavigator: React.FC = () => {
         tabBarActiveTintColor: colors.primary[600],
         tabBarInactiveTintColor: colors.gray[400],
         tabBarStyle: {
-          backgroundColor: colors.white,
-          borderTopColor: colors.gray[200],
+          backgroundColor: theme.surface,
+          borderTopColor: theme.border,
           paddingBottom: 5,
           paddingTop: 5,
           height: 60,
@@ -195,10 +196,16 @@ export const MainNavigator: React.FC = () => {
 };
 
 const tabStyles = StyleSheet.create({
+  iconWrapper: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   badge: {
     position: 'absolute',
     top: -4,
-    right: -8,
+    right: -6,
     backgroundColor: colors.error,
     borderRadius: 8,
     minWidth: 16,

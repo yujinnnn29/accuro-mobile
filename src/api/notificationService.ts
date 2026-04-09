@@ -10,6 +10,9 @@ export interface Notification {
   type: NotificationType;
   isRead: boolean;
   link?: string;
+  actionUrl?: string;
+  relatedId?: string;
+  relatedType?: 'booking' | 'quotation' | 'order';
   createdAt: string;
   updatedAt: string;
 }

@@ -104,11 +104,22 @@ export const NotificationsScreen: React.FC = () => {
       handleMarkAsRead(notification._id);
     }
 
-    // Determine type from notification.type first, then fall back to link parsing
-    const { type: linkType, id } = parseLinkId(notification.link);
-    const resolvedType = notification.type === 'booking' || notification.type === 'quotation'
-      ? notification.type
-      : linkType;
+    // Resolve the target URL: prefer actionUrl, then link
+    const targetUrl = notification.actionUrl || notification.link;
+
+    // Parse ID from URL
+    const { type: urlType, id: urlId } = parseLinkId(targetUrl);
+
+    // Resolve type: explicit notification.type takes priority, then relatedType, then URL-parsed type
+    const resolvedType: 'booking' | 'quotation' | null =
+      notification.type === 'booking' || notification.type === 'quotation'
+        ? notification.type
+        : notification.relatedType === 'booking' || notification.relatedType === 'quotation'
+        ? notification.relatedType
+        : urlType;
+
+    // Resolve ID: relatedId takes priority over URL-parsed id
+    const resolvedId = notification.relatedId || urlId;
 
     if (isAdmin) {
       // Admin — navigate to the relevant module in the drawer
@@ -119,17 +130,17 @@ export const NotificationsScreen: React.FC = () => {
       }
     } else {
       // User — navigate into the relevant tab/screen
-      if (resolvedType === 'booking' && id) {
+      if (resolvedType === 'booking' && resolvedId) {
         navigation.getParent()?.navigate('BookingsTab', {
           screen: 'BookingDetail',
-          params: { bookingId: id },
+          params: { bookingId: resolvedId },
         });
       } else if (resolvedType === 'booking') {
         navigation.getParent()?.navigate('BookingsTab', { screen: 'MyBookings' });
-      } else if (resolvedType === 'quotation' && id) {
+      } else if (resolvedType === 'quotation' && resolvedId) {
         navigation.getParent()?.navigate('MoreTab', {
           screen: 'QuotationDetail',
-          params: { quotationId: id },
+          params: { quotationId: resolvedId },
         });
       } else if (resolvedType === 'quotation') {
         navigation.getParent()?.navigate('MoreTab', { screen: 'MyQuotations' });

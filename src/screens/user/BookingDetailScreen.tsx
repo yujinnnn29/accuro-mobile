@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   Alert,
   RefreshControl,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -26,6 +28,7 @@ import {
   XCircle,
   RefreshCw,
   Wrench,
+  CalendarClock,
 } from 'lucide-react-native';
 import { AssignedTechnician } from '../../types';
 import { bookingService } from '../../api';
@@ -38,6 +41,12 @@ import { BookingsStackParamList } from '../../navigation/types';
 
 type RouteProps = RouteProp<BookingsStackParamList, 'BookingDetail'>;
 
+const TIME_SLOTS = [
+  '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
+  '11:00', '11:30', '12:00', '12:30', '13:00', '13:30',
+  '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00',
+];
+
 export const BookingDetailScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<RouteProps>();
@@ -48,6 +57,16 @@ export const BookingDetailScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Cancel modal
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+
+  // Reschedule modal
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleTime, setRescheduleTime] = useState('');
+  const [rescheduleReason, setRescheduleReason] = useState('');
 
   const fetchBooking = useCallback(async () => {
     try {
@@ -89,36 +108,60 @@ export const BookingDetailScreen: React.FC = () => {
     return `${formattedHour}:${minutes} ${ampm}`;
   };
 
-  const handleCancelBooking = () => {
-    Alert.alert(
-      'Cancel Booking',
-      'Are you sure you want to cancel this booking? This action cannot be undone.',
-      [
-        { text: 'No, Keep It', style: 'cancel' },
-        {
-          text: 'Yes, Cancel',
-          style: 'destructive',
-          onPress: async () => {
-            setActionLoading(true);
-            try {
-              await bookingService.cancel(bookingId, 'Cancelled by user');
-              Alert.alert('Booking Cancelled', 'Your booking has been cancelled.');
-              fetchBooking();
-            } catch (error: any) {
-              Alert.alert('Error', error.response?.data?.message || 'Failed to cancel booking');
-            } finally {
-              setActionLoading(false);
-            }
-          },
-        },
-      ]
-    );
+  const handleCancelConfirm = async () => {
+    setActionLoading(true);
+    try {
+      await bookingService.cancel(bookingId, cancelReason.trim() || 'Cancelled by user');
+      setShowCancelModal(false);
+      setCancelReason('');
+      Alert.alert('Booking Cancelled', 'Your booking has been cancelled.');
+      fetchBooking();
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.message || 'Failed to cancel booking');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRescheduleConfirm = async () => {
+    if (!rescheduleDate.trim()) {
+      Alert.alert('Required', 'Please enter a new date.');
+      return;
+    }
+    if (!rescheduleTime) {
+      Alert.alert('Required', 'Please select a new time.');
+      return;
+    }
+    // Validate date format YYYY-MM-DD
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(rescheduleDate.trim())) {
+      Alert.alert('Invalid Date', 'Please enter date in YYYY-MM-DD format (e.g. 2026-05-15).');
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await bookingService.reschedule(bookingId, rescheduleDate.trim(), rescheduleTime, rescheduleReason.trim() || 'Rescheduled by user');
+      setShowRescheduleModal(false);
+      setRescheduleDate('');
+      setRescheduleTime('');
+      setRescheduleReason('');
+      Alert.alert('Reschedule Requested', 'Your reschedule request has been submitted.');
+      fetchBooking();
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.message || 'Failed to reschedule booking');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const canCancel =
     booking?.status === 'pending' ||
     booking?.status === 'confirmed' ||
     booking?.status === 'rescheduled';
+
+  const canReschedule =
+    booking?.status === 'pending' ||
+    booking?.status === 'confirmed';
 
   const getStatusTimeline = () => {
     const statuses = [
@@ -422,20 +465,134 @@ export const BookingDetailScreen: React.FC = () => {
         )}
 
         {/* Actions */}
-        {canCancel && (
+        {(canCancel || canReschedule) && (
           <View style={styles.actionsSection}>
-            <Button
-              title="Cancel Booking"
-              onPress={handleCancelBooking}
-              variant="danger"
-              fullWidth
-              loading={actionLoading}
-            />
+            {canReschedule && (
+              <TouchableOpacity
+                style={[styles.rescheduleActionBtn, { borderColor: colors.warning }]}
+                onPress={() => setShowRescheduleModal(true)}
+                disabled={actionLoading}
+              >
+                <CalendarClock size={18} color={colors.warning} />
+                <Text style={[styles.rescheduleActionText, { color: colors.warning }]}>Reschedule</Text>
+              </TouchableOpacity>
+            )}
+            {canCancel && (
+              <Button
+                title="Cancel Booking"
+                onPress={() => setShowCancelModal(true)}
+                variant="danger"
+                fullWidth
+                loading={actionLoading}
+              />
+            )}
           </View>
         )}
 
         <View style={styles.bottomPadding} />
       </ScrollView>
+
+      {/* Cancel Modal */}
+      <Modal visible={showCancelModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: theme.surface }]}>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>Cancel Booking</Text>
+            <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
+              Are you sure? Please provide a reason (optional).
+            </Text>
+            <TextInput
+              style={[styles.modalInput, { borderColor: theme.border, color: theme.text, backgroundColor: theme.background }]}
+              value={cancelReason}
+              onChangeText={setCancelReason}
+              placeholder="Reason for cancelling..."
+              placeholderTextColor={theme.textSecondary}
+              multiline
+              numberOfLines={3}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalCancelBtn, { borderColor: theme.border }]}
+                onPress={() => { setShowCancelModal(false); setCancelReason(''); }}
+                disabled={actionLoading}
+              >
+                <Text style={[styles.modalCancelText, { color: theme.textSecondary }]}>Keep Booking</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalConfirmBtn, actionLoading && { opacity: 0.6 }]}
+                onPress={handleCancelConfirm}
+                disabled={actionLoading}
+              >
+                <Text style={styles.modalConfirmText}>{actionLoading ? 'Cancelling...' : 'Yes, Cancel'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Reschedule Modal */}
+      <Modal visible={showRescheduleModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: theme.surface }]}>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>Reschedule Booking</Text>
+            <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
+              Enter a new date and time for your booking.
+            </Text>
+            <Text style={[styles.modalLabel, { color: theme.text }]}>New Date (YYYY-MM-DD) *</Text>
+            <TextInput
+              style={[styles.modalInput, { borderColor: theme.border, color: theme.text, backgroundColor: theme.background }]}
+              value={rescheduleDate}
+              onChangeText={setRescheduleDate}
+              placeholder="e.g. 2026-05-15"
+              placeholderTextColor={theme.textSecondary}
+              keyboardType="numbers-and-punctuation"
+            />
+            <Text style={[styles.modalLabel, { color: theme.text }]}>New Time *</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.timeSlotsScroll}>
+              {TIME_SLOTS.map(slot => (
+                <TouchableOpacity
+                  key={slot}
+                  style={[
+                    styles.timeSlotBtn,
+                    { borderColor: theme.border, backgroundColor: theme.background },
+                    rescheduleTime === slot && styles.timeSlotBtnSelected,
+                  ]}
+                  onPress={() => setRescheduleTime(slot)}
+                >
+                  <Text style={[styles.timeSlotBtnText, rescheduleTime === slot && styles.timeSlotBtnTextSelected]}>
+                    {formatTime(slot)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <Text style={[styles.modalLabel, { color: theme.text }]}>Reason (optional)</Text>
+            <TextInput
+              style={[styles.modalInput, { borderColor: theme.border, color: theme.text, backgroundColor: theme.background }]}
+              value={rescheduleReason}
+              onChangeText={setRescheduleReason}
+              placeholder="Reason for rescheduling..."
+              placeholderTextColor={theme.textSecondary}
+              multiline
+              numberOfLines={2}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalCancelBtn, { borderColor: theme.border }]}
+                onPress={() => { setShowRescheduleModal(false); setRescheduleDate(''); setRescheduleTime(''); setRescheduleReason(''); }}
+                disabled={actionLoading}
+              >
+                <Text style={[styles.modalCancelText, { color: theme.textSecondary }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalRescheduleBtn, actionLoading && { opacity: 0.6 }]}
+                onPress={handleRescheduleConfirm}
+                disabled={actionLoading}
+              >
+                <Text style={styles.modalConfirmText}>{actionLoading ? 'Submitting...' : 'Confirm'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -665,9 +822,118 @@ const styles = StyleSheet.create({
   },
   actionsSection: {
     padding: 16,
+    gap: 10,
+  },
+  rescheduleActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    marginBottom: 4,
+  },
+  rescheduleActionText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   bottomPadding: {
     height: 24,
+  },
+  // Modals
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 32,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    marginBottom: 12,
+  },
+  modalLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 6,
+    marginTop: 8,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    minHeight: 48,
+    textAlignVertical: 'top',
+    marginBottom: 4,
+  },
+  timeSlotsScroll: {
+    marginBottom: 8,
+  },
+  timeSlotBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginRight: 6,
+    marginVertical: 4,
+  },
+  timeSlotBtnSelected: {
+    backgroundColor: colors.primary[600],
+    borderColor: colors.primary[600],
+  },
+  timeSlotBtnText: {
+    fontSize: 13,
+    color: colors.gray[700],
+  },
+  timeSlotBtnTextSelected: {
+    color: colors.white,
+    fontWeight: '600',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 16,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  modalConfirmBtn: {
+    flex: 2,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: colors.error,
+    alignItems: 'center',
+  },
+  modalRescheduleBtn: {
+    flex: 2,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: colors.primary[600],
+    alignItems: 'center',
+  },
+  modalConfirmText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.white,
   },
 });
 
