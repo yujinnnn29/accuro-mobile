@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   Alert,
   TextInput,
   Modal,
+  PanResponder,
+  Image,
 } from 'react-native';
 import {
   Calendar,
@@ -16,7 +18,6 @@ import {
   MapPin,
   Building,
   Package,
-  User,
   Play,
   ClipboardList,
   RefreshCw,
@@ -25,7 +26,13 @@ import {
   ChevronUp,
   Info,
   Send,
+  FileText,
+  Paperclip,
+  X,
+  ChevronRight,
 } from 'lucide-react-native';
+import Svg, { Path as SvgPath } from 'react-native-svg';
+import { launchImageLibrary } from 'react-native-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { TechnicianDrawerParamList } from '../../navigation/types';
@@ -75,13 +82,7 @@ const formatTime = (time: string) => {
   return `${hour % 12 || 12}:${m} ${ampm}`;
 };
 
-interface ReportModalProps {
-  visible: boolean;
-  booking: Booking | null;
-  onClose: () => void;
-  onSubmit: (report: ServiceReport) => void;
-  submitting: boolean;
-}
+// ─── Interfaces ─────────────────────────────────────────────────────────────
 
 interface ServiceReport {
   workPerformed: string;
@@ -90,82 +91,363 @@ interface ServiceReport {
   recommendations: string;
 }
 
-const ReportModal: React.FC<ReportModalProps> = ({ visible, booking, onClose, onSubmit, submitting }) => {
-  const [report, setReport] = useState<ServiceReport>({
-    workPerformed: '',
-    equipmentUsed: '',
-    issuesFound: '',
-    recommendations: '',
-  });
+interface AttachmentFile {
+  uri: string;
+  name: string;
+  type: string;
+  size: number;
+}
 
-  const handleSubmit = () => {
-    if (!report.workPerformed.trim()) {
-      Alert.alert('Required', 'Please describe the work performed.');
-      return;
-    }
-    onSubmit(report);
+interface SignatureInfo {
+  paths: { x: number; y: number }[][];
+  signedBy: string;
+}
+
+interface CompletionReportData {
+  serviceReport: ServiceReport;
+  attachments: AttachmentFile[];
+  signature: SignatureInfo;
+}
+
+interface CompletionReportModalProps {
+  visible: boolean;
+  booking: Booking | null;
+  onClose: () => void;
+  onSubmit: (data: CompletionReportData) => void;
+  submitting: boolean;
+}
+
+// ─── Signature Pad ───────────────────────────────────────────────────────────
+
+const SignaturePad: React.FC<{
+  paths: { x: number; y: number }[][];
+  onPathsChange: (paths: { x: number; y: number }[][]) => void;
+}> = ({ paths, onPathsChange }) => {
+  const pathsRef = useRef(paths);
+  const onChangeRef = useRef(onPathsChange);
+  const currentPath = useRef<{ x: number; y: number }[]>([]);
+  const [size, setSize] = useState({ width: 300, height: 150 });
+
+  useEffect(() => { pathsRef.current = paths; }, [paths]);
+  useEffect(() => { onChangeRef.current = onPathsChange; }, [onPathsChange]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        const { locationX, locationY } = evt.nativeEvent;
+        currentPath.current = [{ x: locationX, y: locationY }];
+        onChangeRef.current([...pathsRef.current, [...currentPath.current]]);
+      },
+      onPanResponderMove: (evt) => {
+        const { locationX, locationY } = evt.nativeEvent;
+        currentPath.current.push({ x: locationX, y: locationY });
+        onChangeRef.current([...pathsRef.current.slice(0, -1), [...currentPath.current]]);
+      },
+    })
+  ).current;
+
+  const buildPathD = (pts: { x: number; y: number }[]) => {
+    if (pts.length < 2) return '';
+    return `M${pts[0].x} ${pts[0].y} ` + pts.slice(1).map(p => `L${p.x} ${p.y}`).join(' ');
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={modalStyles.overlay}>
-        <View style={modalStyles.container}>
-          <Text style={modalStyles.title}>Completion Report</Text>
-          {booking && (
-            <Text style={modalStyles.subtitle}>{booking.company} — {booking.contactName}</Text>
+    <View
+      style={sigStyles.canvas}
+      onLayout={e => setSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
+      {...panResponder.panHandlers}
+    >
+      <Svg width={size.width} height={size.height} style={StyleSheet.absoluteFill}>
+        {paths.map((path, i) => {
+          const d = buildPathD(path);
+          return d ? (
+            <SvgPath key={i} d={d} stroke="#1e293b" strokeWidth={2.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          ) : null;
+        })}
+      </Svg>
+      {paths.length === 0 && (
+        <Text style={sigStyles.placeholder}>Sign here...</Text>
+      )}
+    </View>
+  );
+};
+
+// ─── Completion Report Modal (4-step) ────────────────────────────────────────
+
+const STEP_LABELS = ['Service\nReport', 'Attachments', 'Signature', 'Review &\nSubmit'];
+
+const CompletionReportModal: React.FC<CompletionReportModalProps> = ({
+  visible, booking, onClose, onSubmit, submitting,
+}) => {
+  const [step, setStep] = useState(0);
+  const [serviceReport, setServiceReport] = useState<ServiceReport>({
+    workPerformed: '', equipmentUsed: '', issuesFound: '', recommendations: '',
+  });
+  const [attachments, setAttachments] = useState<AttachmentFile[]>([]);
+  const [sigPaths, setSigPaths] = useState<{ x: number; y: number }[][]>([]);
+  const [signedBy, setSignedBy] = useState('');
+
+  useEffect(() => {
+    if (visible) {
+      setStep(0);
+      setServiceReport({ workPerformed: '', equipmentUsed: '', issuesFound: '', recommendations: '' });
+      setAttachments([]);
+      setSigPaths([]);
+      setSignedBy('');
+    }
+  }, [visible]);
+
+  const handleNext = () => {
+    if (step === 0 && !serviceReport.workPerformed.trim()) {
+      Alert.alert('Required', 'Please describe the work performed.');
+      return;
+    }
+    setStep(s => s + 1);
+  };
+
+  const handlePickImage = () => {
+    if (attachments.length >= 5) {
+      Alert.alert('Limit Reached', 'Maximum 5 attachments allowed.');
+      return;
+    }
+    launchImageLibrary(
+      { mediaType: 'photo', quality: 0.8, selectionLimit: 5 - attachments.length },
+      (response) => {
+        if (response.assets) {
+          const newFiles: AttachmentFile[] = response.assets.map(asset => ({
+            uri: asset.uri!,
+            name: asset.fileName || `photo_${Date.now()}.jpg`,
+            type: asset.type || 'image/jpeg',
+            size: asset.fileSize || 0,
+          }));
+          setAttachments(prev => [...prev, ...newFiles].slice(0, 5));
+        }
+      }
+    );
+  };
+
+  const handleSubmit = () => {
+    onSubmit({ serviceReport, attachments, signature: { paths: sigPaths, signedBy } });
+  };
+
+  // Step indicator
+  const renderStepIndicator = () => (
+    <View style={mStyles.stepRow}>
+      {STEP_LABELS.map((label, i) => (
+        <React.Fragment key={i}>
+          <View style={mStyles.stepItem}>
+            <View style={[
+              mStyles.stepCircle,
+              i <= step && mStyles.stepCircleActive,
+              i < step && mStyles.stepCircleDone,
+            ]}>
+              {i < step
+                ? <CheckCircle size={13} color="#fff" />
+                : <Text style={[mStyles.stepNum, i <= step && mStyles.stepNumActive]}>{i + 1}</Text>
+              }
+            </View>
+            <Text style={[mStyles.stepLabel, i === step && mStyles.stepLabelActive]} numberOfLines={2}>
+              {label}
+            </Text>
+          </View>
+          {i < STEP_LABELS.length - 1 && (
+            <View style={[mStyles.stepLine, i < step && mStyles.stepLineDone]} />
           )}
-          <ScrollView style={modalStyles.scroll} keyboardShouldPersistTaps="handled">
-            <Text style={modalStyles.label}>Work Performed *</Text>
-            <TextInput
-              style={[modalStyles.input, modalStyles.textarea]}
-              value={report.workPerformed}
-              onChangeText={t => setReport(r => ({ ...r, workPerformed: t }))}
-              placeholder="Describe the work performed..."
-              multiline
-              numberOfLines={4}
-            />
-            <Text style={modalStyles.label}>Equipment Used</Text>
-            <TextInput
-              style={[modalStyles.input, modalStyles.textarea]}
-              value={report.equipmentUsed}
-              onChangeText={t => setReport(r => ({ ...r, equipmentUsed: t }))}
-              placeholder="List equipment used..."
-              multiline
-              numberOfLines={3}
-            />
-            <Text style={modalStyles.label}>Issues Found</Text>
-            <TextInput
-              style={[modalStyles.input, modalStyles.textarea]}
-              value={report.issuesFound}
-              onChangeText={t => setReport(r => ({ ...r, issuesFound: t }))}
-              placeholder="Any issues found..."
-              multiline
-              numberOfLines={3}
-            />
-            <Text style={modalStyles.label}>Recommendations</Text>
-            <TextInput
-              style={[modalStyles.input, modalStyles.textarea]}
-              value={report.recommendations}
-              onChangeText={t => setReport(r => ({ ...r, recommendations: t }))}
-              placeholder="Recommendations for follow-up..."
-              multiline
-              numberOfLines={3}
-            />
-          </ScrollView>
-          <View style={modalStyles.actions}>
-            <TouchableOpacity style={modalStyles.cancelBtn} onPress={onClose} disabled={submitting}>
-              <Text style={modalStyles.cancelBtnText}>Cancel</Text>
+        </React.Fragment>
+      ))}
+    </View>
+  );
+
+  // Step 1: Service Report
+  const renderStep0 = () => (
+    <ScrollView style={mStyles.scroll} keyboardShouldPersistTaps="handled">
+      <Text style={mStyles.label}>Work Performed <Text style={mStyles.required}>*</Text></Text>
+      <TextInput
+        style={[mStyles.input, mStyles.textarea]}
+        value={serviceReport.workPerformed}
+        onChangeText={t => setServiceReport(r => ({ ...r, workPerformed: t }))}
+        placeholder="Describe the work performed..."
+        placeholderTextColor="#9ca3af"
+        multiline
+        numberOfLines={4}
+      />
+      <Text style={mStyles.label}>Equipment Used</Text>
+      <TextInput
+        style={[mStyles.input, mStyles.textarea]}
+        value={serviceReport.equipmentUsed}
+        onChangeText={t => setServiceReport(r => ({ ...r, equipmentUsed: t }))}
+        placeholder="List equipment used..."
+        placeholderTextColor="#9ca3af"
+        multiline
+        numberOfLines={3}
+      />
+      <Text style={mStyles.label}>Issues Found</Text>
+      <TextInput
+        style={[mStyles.input, mStyles.textarea]}
+        value={serviceReport.issuesFound}
+        onChangeText={t => setServiceReport(r => ({ ...r, issuesFound: t }))}
+        placeholder="Any issues found..."
+        placeholderTextColor="#9ca3af"
+        multiline
+        numberOfLines={3}
+      />
+      <Text style={mStyles.label}>Recommendations</Text>
+      <TextInput
+        style={[mStyles.input, mStyles.textarea]}
+        value={serviceReport.recommendations}
+        onChangeText={t => setServiceReport(r => ({ ...r, recommendations: t }))}
+        placeholder="Recommendations for follow-up..."
+        placeholderTextColor="#9ca3af"
+        multiline
+        numberOfLines={3}
+      />
+    </ScrollView>
+  );
+
+  // Step 2: Attachments
+  const renderStep1 = () => (
+    <ScrollView style={mStyles.scroll}>
+      <TouchableOpacity style={mStyles.uploadBtn} onPress={handlePickImage}>
+        <Paperclip size={18} color="#2563eb" />
+        <Text style={mStyles.uploadBtnText}>Add Photos</Text>
+        <Text style={mStyles.uploadLimit}>{attachments.length}/5</Text>
+      </TouchableOpacity>
+      <Text style={mStyles.uploadHint}>Max 5 photos · Optional</Text>
+      {attachments.map((file, i) => (
+        <View key={i} style={mStyles.attachItem}>
+          <Image source={{ uri: file.uri }} style={mStyles.attachThumb} />
+          <Text style={mStyles.attachName} numberOfLines={1}>{file.name}</Text>
+          <TouchableOpacity onPress={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))} style={mStyles.attachRemove}>
+            <X size={14} color="#dc2626" />
+          </TouchableOpacity>
+        </View>
+      ))}
+    </ScrollView>
+  );
+
+  // Step 3: Signature
+  const renderStep2 = () => (
+    <ScrollView style={mStyles.scroll} keyboardShouldPersistTaps="handled">
+      <Text style={mStyles.label}>Signed By</Text>
+      <TextInput
+        style={mStyles.input}
+        value={signedBy}
+        onChangeText={setSignedBy}
+        placeholder="Customer name (optional)..."
+        placeholderTextColor="#9ca3af"
+      />
+      <View style={mStyles.sigHeader}>
+        <Text style={mStyles.label}>Signature <Text style={mStyles.optionalLabel}>(optional)</Text></Text>
+        {sigPaths.length > 0 && (
+          <TouchableOpacity onPress={() => setSigPaths([])}>
+            <Text style={mStyles.clearSig}>Clear</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+      <SignaturePad paths={sigPaths} onPathsChange={setSigPaths} />
+    </ScrollView>
+  );
+
+  // Step 4: Review & Submit
+  const renderStep3 = () => (
+    <ScrollView style={mStyles.scroll}>
+      {booking && (
+        <View style={mStyles.reviewSection}>
+          <Text style={mStyles.reviewSectionTitle}>Booking Info</Text>
+          <Text style={mStyles.reviewItem}><Text style={mStyles.reviewKey}>Company: </Text>{booking.company}</Text>
+          <Text style={mStyles.reviewItem}><Text style={mStyles.reviewKey}>Contact: </Text>{booking.contactName}</Text>
+          <Text style={mStyles.reviewItem}>
+            <Text style={mStyles.reviewKey}>Date: </Text>
+            {formatDate(booking.date)} at {formatTime(booking.time)}
+          </Text>
+        </View>
+      )}
+      <View style={mStyles.reviewSection}>
+        <Text style={mStyles.reviewSectionTitle}>Service Report</Text>
+        <Text style={mStyles.reviewItem}>
+          <Text style={mStyles.reviewKey}>Work Performed: </Text>
+          {serviceReport.workPerformed || '—'}
+        </Text>
+        {!!serviceReport.equipmentUsed && (
+          <Text style={mStyles.reviewItem}>
+            <Text style={mStyles.reviewKey}>Equipment Used: </Text>
+            {serviceReport.equipmentUsed}
+          </Text>
+        )}
+        {!!serviceReport.issuesFound && (
+          <Text style={mStyles.reviewItem}>
+            <Text style={mStyles.reviewKey}>Issues Found: </Text>
+            {serviceReport.issuesFound}
+          </Text>
+        )}
+        {!!serviceReport.recommendations && (
+          <Text style={mStyles.reviewItem}>
+            <Text style={mStyles.reviewKey}>Recommendations: </Text>
+            {serviceReport.recommendations}
+          </Text>
+        )}
+      </View>
+      <View style={mStyles.reviewSection}>
+        <Text style={mStyles.reviewSectionTitle}>Attachments</Text>
+        <Text style={mStyles.reviewItem}>
+          {attachments.length > 0 ? `${attachments.length} photo(s) attached` : 'No attachments'}
+        </Text>
+      </View>
+      <View style={mStyles.reviewSection}>
+        <Text style={mStyles.reviewSectionTitle}>Signature</Text>
+        <Text style={mStyles.reviewItem}>
+          {sigPaths.length > 0
+            ? `Signature captured${signedBy ? ` — signed by ${signedBy}` : ''}`
+            : 'No signature captured'}
+        </Text>
+      </View>
+    </ScrollView>
+  );
+
+  const stepContent = [renderStep0, renderStep1, renderStep2, renderStep3];
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent>
+      <View style={mStyles.overlay}>
+        <View style={mStyles.container}>
+          <Text style={mStyles.title}>Completion Report</Text>
+          {booking && (
+            <Text style={mStyles.subtitle}>{booking.company} — {booking.contactName}</Text>
+          )}
+
+          {renderStepIndicator()}
+
+          {stepContent[step]()}
+
+          <View style={mStyles.navRow}>
+            <TouchableOpacity
+              style={mStyles.cancelBtn}
+              onPress={step === 0 ? onClose : () => setStep(s => s - 1)}
+              disabled={submitting}
+            >
+              <Text style={mStyles.cancelBtnText}>{step === 0 ? 'Cancel' : 'Back'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={modalStyles.submitBtn} onPress={handleSubmit} disabled={submitting}>
-              <Send size={14} color="#fff" />
-              <Text style={modalStyles.submitBtnText}>{submitting ? 'Submitting...' : 'Submit Report'}</Text>
-            </TouchableOpacity>
+            {step < 3 ? (
+              <TouchableOpacity style={mStyles.nextBtn} onPress={handleNext}>
+                <Text style={mStyles.nextBtnText}>Next</Text>
+                <ChevronRight size={16} color="#fff" />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={mStyles.submitBtn} onPress={handleSubmit} disabled={submitting}>
+                <Send size={14} color="#fff" />
+                <Text style={mStyles.submitBtnText}>{submitting ? 'Submitting...' : 'Submit Report'}</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
     </Modal>
   );
 };
+
+// ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export const TechnicianAssignmentsScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -205,14 +487,12 @@ export const TechnicianAssignmentsScreen: React.FC = () => {
       }
     }).catch(() => {});
     fetchAssignments();
-    // Refresh when screen comes back into focus (no extra hook needed)
     const unsubscribe = (navigation as any).addListener('focus', () => {
       fetchAssignments();
     });
     return unsubscribe;
   }, [fetchAssignments, navigation]);
 
-  // Auto-open report modal when navigated from dashboard with a submitBookingId
   useEffect(() => {
     if (submitBookingId && assignments.length > 0) {
       const booking = assignments.find(a => a._id === submitBookingId);
@@ -234,7 +514,6 @@ export const TechnicianAssignmentsScreen: React.FC = () => {
     } catch (error: any) {
       const msg: string = error.response?.data?.message || '';
       if (msg.toLowerCase().includes('in_progress') || msg.toLowerCase().includes('already')) {
-        // Booking already started — just refresh so UI reflects server state
         fetchAssignments();
       } else {
         Alert.alert('Error', msg || 'Failed to start meeting');
@@ -244,16 +523,55 @@ export const TechnicianAssignmentsScreen: React.FC = () => {
     }
   };
 
-  const handleSubmitReport = async (report: ServiceReport) => {
+  const handleSubmitReport = async (data: CompletionReportData) => {
     if (!reportModalBooking) return;
     try {
       setSubmittingReport(true);
-      // Submit completion proof via API
       const api = (await import('../../api/api')).default;
-      await api.post('/completion-proofs', {
-        bookingId: reportModalBooking._id,
-        serviceReport: report,
-      }, { adapter: 'xhr' });
+
+      // Build signature data URL from drawn paths if present
+      let signatureData: string | undefined;
+      if (data.signature.paths.length > 0) {
+        const svgPaths = data.signature.paths
+          .map(path => {
+            if (path.length < 2) return '';
+            const d = `M${path[0].x} ${path[0].y} ` + path.slice(1).map(p => `L${p.x} ${p.y}`).join(' ');
+            return `<path d="${d}" stroke="black" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+          })
+          .filter(Boolean)
+          .join('');
+        const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="150" style="background:white">${svgPaths}</svg>`;
+        // encode SVG as base64 — btoa is available as a global in React Native's Hermes/JSC
+        signatureData = `data:image/svg+xml;base64,${(globalThis as any).btoa(svgStr)}`;
+      }
+
+      if (data.attachments.length > 0) {
+        const formData = new FormData();
+        formData.append('bookingId', reportModalBooking._id);
+        formData.append('serviceReport', JSON.stringify(data.serviceReport));
+        if (signatureData) {
+          formData.append('signatureData', signatureData);
+          formData.append('signedBy', data.signature.signedBy);
+        }
+        data.attachments.forEach(file => {
+          (formData as any).append('attachments', { uri: file.uri, name: file.name, type: file.type });
+        });
+        await api.post('/completion-proofs', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          adapter: 'xhr',
+        });
+      } else {
+        const body: any = {
+          bookingId: reportModalBooking._id,
+          serviceReport: data.serviceReport,
+        };
+        if (signatureData) {
+          body.signatureData = signatureData;
+          body.signedBy = data.signature.signedBy;
+        }
+        await api.post('/completion-proofs', body, { adapter: 'xhr' });
+      }
+
       Alert.alert('Success', 'Completion report submitted successfully');
       setReportModalBooking(null);
       fetchAssignments();
@@ -494,7 +812,7 @@ export const TechnicianAssignmentsScreen: React.FC = () => {
       </Modal>
 
       {/* Completion Report Modal */}
-      <ReportModal
+      <CompletionReportModal
         visible={!!reportModalBooking}
         booking={reportModalBooking}
         onClose={() => setReportModalBooking(null)}
@@ -504,6 +822,8 @@ export const TechnicianAssignmentsScreen: React.FC = () => {
     </View>
   );
 };
+
+// ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.gray[50] },
@@ -543,7 +863,6 @@ const styles = StyleSheet.create({
   },
   tabBadgeText: { color: '#fff', fontSize: 9, fontWeight: 'bold' },
 
-  // Success modal
   successOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -571,18 +890,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 16,
   },
-  successTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  successMessage: {
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 24,
-  },
+  successTitle: { fontSize: 20, fontWeight: '700', marginBottom: 8, textAlign: 'center' },
+  successMessage: { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
   successBtn: {
     backgroundColor: '#059669',
     paddingVertical: 12,
@@ -592,6 +901,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   successBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+
   list: { flex: 1 },
   listContent: { padding: 14, gap: 10 },
   loadingText: { textAlign: 'center', color: colors.gray[400], padding: 40 },
@@ -643,19 +953,43 @@ const styles = StyleSheet.create({
   btnText: { fontSize: 12, fontWeight: '600', color: '#fff' },
 });
 
-const modalStyles = StyleSheet.create({
+const mStyles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   container: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
-    maxHeight: '85%',
+    maxHeight: '92%',
   },
-  title: { fontSize: 18, fontWeight: '700', color: colors.gray[900], marginBottom: 4 },
-  subtitle: { fontSize: 13, color: colors.gray[500], marginBottom: 16 },
-  scroll: { maxHeight: 400 },
+  title: { fontSize: 18, fontWeight: '700', color: colors.gray[900], marginBottom: 2 },
+  subtitle: { fontSize: 13, color: colors.gray[500], marginBottom: 12 },
+
+  // Step indicator
+  stepRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16 },
+  stepItem: { alignItems: 'center', width: 56 },
+  stepCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.gray[200],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  stepCircleActive: { backgroundColor: colors.primary[600] },
+  stepCircleDone: { backgroundColor: '#059669' },
+  stepNum: { fontSize: 12, fontWeight: '700', color: colors.gray[500] },
+  stepNumActive: { color: '#fff' },
+  stepLabel: { fontSize: 9, color: colors.gray[400], textAlign: 'center', lineHeight: 12 },
+  stepLabelActive: { color: colors.primary[600], fontWeight: '600' },
+  stepLine: { flex: 1, height: 2, backgroundColor: colors.gray[200], marginTop: 13 },
+  stepLineDone: { backgroundColor: '#059669' },
+
+  scroll: { maxHeight: 380 },
   label: { fontSize: 13, fontWeight: '600', color: colors.gray[700], marginBottom: 6, marginTop: 12 },
+  required: { color: '#dc2626' },
+  optionalLabel: { fontSize: 11, fontWeight: '400', color: colors.gray[400] },
   input: {
     borderWidth: 1,
     borderColor: colors.gray[300],
@@ -666,7 +1000,64 @@ const modalStyles = StyleSheet.create({
     color: colors.gray[900],
   },
   textarea: { minHeight: 80, textAlignVertical: 'top' },
-  actions: { flexDirection: 'row', gap: 10, marginTop: 16 },
+
+  // Attachments
+  uploadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1.5,
+    borderColor: '#2563eb',
+    borderStyle: 'dashed',
+    borderRadius: 10,
+    padding: 16,
+    marginTop: 12,
+    justifyContent: 'center',
+  },
+  uploadBtnText: { fontSize: 14, fontWeight: '600', color: '#2563eb', flex: 1, textAlign: 'center' },
+  uploadLimit: { fontSize: 12, color: colors.gray[400] },
+  uploadHint: { fontSize: 11, color: colors.gray[400], textAlign: 'center', marginTop: 6 },
+  attachItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.gray[50],
+    borderRadius: 8,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    marginTop: 8,
+  },
+  attachThumb: { width: 40, height: 40, borderRadius: 6 },
+  attachName: { flex: 1, fontSize: 12, color: colors.gray[700] },
+  attachRemove: { padding: 4 },
+
+  // Signature
+  sigHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  clearSig: { fontSize: 13, color: '#dc2626', fontWeight: '500', marginTop: 12 },
+
+  // Review
+  reviewSection: {
+    marginBottom: 10,
+    backgroundColor: colors.gray[50],
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.gray[100],
+  },
+  reviewSectionTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.primary[600],
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  reviewItem: { fontSize: 13, color: colors.gray[700], marginBottom: 3, lineHeight: 18 },
+  reviewKey: { fontWeight: '600', color: colors.gray[800] },
+
+  // Navigation
+  navRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
   cancelBtn: {
     flex: 1,
     paddingVertical: 12,
@@ -676,6 +1067,17 @@ const modalStyles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelBtnText: { fontSize: 14, fontWeight: '600', color: colors.gray[700] },
+  nextBtn: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: colors.primary[600],
+  },
+  nextBtnText: { fontSize: 14, fontWeight: '600', color: '#fff' },
   submitBtn: {
     flex: 2,
     flexDirection: 'row',
@@ -687,6 +1089,24 @@ const modalStyles = StyleSheet.create({
     backgroundColor: '#059669',
   },
   submitBtnText: { fontSize: 14, fontWeight: '600', color: '#fff' },
+});
+
+const sigStyles = StyleSheet.create({
+  canvas: {
+    height: 160,
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.gray[300],
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholder: {
+    position: 'absolute',
+    color: colors.gray[400],
+    fontSize: 13,
+  },
 });
 
 export default TechnicianAssignmentsScreen;
