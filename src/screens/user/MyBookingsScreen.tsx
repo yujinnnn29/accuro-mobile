@@ -60,10 +60,12 @@ export const MyBookingsScreen: React.FC = () => {
     fetchBookings();
   };
 
-  const filteredBookings = bookings.filter((booking) => {
-    if (selectedFilter === 'all') return true;
-    return booking.status === selectedFilter;
-  });
+  const filteredBookings = bookings
+    .filter((booking) => {
+      if (selectedFilter === 'all') return true;
+      return booking.status === selectedFilter;
+    })
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const handleBookingPress = (booking: Booking) => {
     navigation.navigate('BookingDetail', { bookingId: booking._id });
