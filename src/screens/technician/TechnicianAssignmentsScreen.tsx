@@ -11,6 +11,7 @@ import {
   Modal,
   PanResponder,
   Image,
+  Linking,
 } from 'react-native';
 import {
   Calendar,
@@ -32,6 +33,7 @@ import {
   ChevronRight,
 } from 'lucide-react-native';
 import Svg, { Path as SvgPath } from 'react-native-svg';
+import { SvgXml } from 'react-native-svg';
 import { launchImageLibrary } from 'react-native-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -43,7 +45,7 @@ import { useTheme } from '../../contexts';
 const CACHE_KEY = 'technician_assignments_cache';
 import { colors } from '../../theme';
 
-type FilterTab = 'today' | 'upcoming' | 'pending_completion' | 'pending_review' | 'completed' | 'all';
+type FilterTab = 'today' | 'upcoming' | 'pending_completion' | 'pending_review' | 'completed' | 'verified' | 'payment_submitted' | 'all';
 
 const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: 'today', label: 'Today' },
@@ -51,16 +53,20 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: 'pending_completion', label: 'Pending' },
   { key: 'pending_review', label: 'In Review' },
   { key: 'completed', label: 'Completed' },
+  { key: 'verified', label: 'Verified' },
+  { key: 'payment_submitted', label: 'Payment Submitted' },
   { key: 'all', label: 'All' },
 ];
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }> = {
-  confirmed:      { bg: '#dbeafe', text: '#1d4ed8', label: 'Confirmed' },
-  in_progress:    { bg: '#fef9c3', text: '#b45309', label: 'In Progress' },
-  pending_review: { bg: '#ede9fe', text: '#7c3aed', label: 'Pending Review' },
-  completed:      { bg: '#dcfce7', text: '#15803d', label: 'Completed' },
-  cancelled:      { bg: '#fee2e2', text: '#dc2626', label: 'Cancelled' },
-  pending:        { bg: '#f3f4f6', text: '#374151', label: 'Pending' },
+  confirmed:         { bg: '#dbeafe', text: '#1d4ed8', label: 'Confirmed' },
+  in_progress:       { bg: '#fef9c3', text: '#b45309', label: 'In Progress' },
+  pending_review:    { bg: '#ede9fe', text: '#7c3aed', label: 'Pending Review' },
+  completed:         { bg: '#dcfce7', text: '#15803d', label: 'Completed' },
+  cancelled:         { bg: '#fee2e2', text: '#dc2626', label: 'Cancelled' },
+  pending:           { bg: '#f3f4f6', text: '#374151', label: 'Pending' },
+  verified:          { bg: '#ccfbf1', text: '#0f766e', label: 'Verified' },
+  payment_submitted: { bg: '#e0e7ff', text: '#4338ca', label: 'Payment Submitted' },
 };
 
 const EMPTY_MESSAGES: Record<FilterTab, { title: string; subtitle: string }> = {
@@ -69,6 +75,8 @@ const EMPTY_MESSAGES: Record<FilterTab, { title: string; subtitle: string }> = {
   pending_completion: { title: 'No pending assignments', subtitle: 'All assignments are up to date' },
   pending_review:     { title: 'No reports pending review', subtitle: 'All submitted reports have been reviewed' },
   completed:          { title: 'No completed assignments', subtitle: 'Completed assignments will appear here' },
+  verified:           { title: 'No verified assignments', subtitle: 'Verified assignments will appear here' },
+  payment_submitted:  { title: 'No payment submitted', subtitle: 'Assignments awaiting payment will appear here' },
   all:                { title: 'No assignments found', subtitle: 'You have not been assigned any bookings yet' },
 };
 
@@ -397,11 +405,20 @@ const CompletionReportModal: React.FC<CompletionReportModalProps> = ({
       </View>
       <View style={mStyles.reviewSection}>
         <Text style={mStyles.reviewSectionTitle}>Signature</Text>
-        <Text style={mStyles.reviewItem}>
-          {sigPaths.length > 0
-            ? `Signature captured${signedBy ? ` — signed by ${signedBy}` : ''}`
-            : 'No signature captured'}
-        </Text>
+        {sigPaths.length > 0 ? (
+          <View style={mStyles.reviewSigBox}>
+            <Svg width="100%" height={100}>
+              {sigPaths.map((path, i) => {
+                if (path.length < 2) return null;
+                const d = `M${path[0].x} ${path[0].y} ` + path.slice(1).map(p => `L${p.x} ${p.y}`).join(' ');
+                return <SvgPath key={i} d={d} stroke="#1e293b" strokeWidth={2.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />;
+              })}
+            </Svg>
+            {!!signedBy && <Text style={mStyles.reviewSigName}>Signed by: {signedBy}</Text>}
+          </View>
+        ) : (
+          <Text style={mStyles.reviewItem}>No signature captured</Text>
+        )}
       </View>
     </ScrollView>
   );
@@ -447,6 +464,215 @@ const CompletionReportModal: React.FC<CompletionReportModalProps> = ({
   );
 };
 
+// ─── View Report Modal ───────────────────────────────────────────────────────
+
+const ViewReportModal: React.FC<{ visible: boolean; booking: Booking | null; onClose: () => void }> = ({ visible, booking, onClose }) => {
+  const [loading, setLoading] = useState(false);
+  const [report, setReport] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
+
+  useEffect(() => {
+    if (!visible || !booking) return;
+    setReport(null);
+    setError(null);
+    setLoading(true);
+
+    // Promise.race-based timeout that works regardless of axios adapter
+    const raceTimeout = <T>(p: Promise<T>, ms: number): Promise<T> =>
+      Promise.race([
+        p,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(Object.assign(new Error('Request timed out'), { isTimeout: true })), ms),
+        ),
+      ]);
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { default: api } = await import('../../api/api');
+        let res: any = null;
+
+        // Try primary endpoint (40 s — allows backend cold start on Render.com free tier)
+        try {
+          res = await raceTimeout(api.get(`/completion-proofs/booking/${booking._id}`), 40000);
+        } catch (e1: any) {
+          // 404 or timeout → try fallback endpoint (35 s)
+          if (e1?.isTimeout || e1?.response?.status === 404 || e1?.response?.status === undefined) {
+            try {
+              res = await raceTimeout(api.get(`/completion-proofs?bookingId=${booking._id}`), 35000);
+            } catch {
+              res = null; // no report found
+            }
+          } else {
+            throw e1; // real server error
+          }
+        }
+
+        if (cancelled) return;
+        const d = res?.data?.data;
+        setReport(Array.isArray(d) ? d[d.length - 1] ?? null : d ?? null);
+      } catch (e: any) {
+        if (cancelled) return;
+        setError('Could not load report.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [visible, booking, retryKey]);
+
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={vrStyles.overlay}>
+        <View style={vrStyles.container}>
+          <View style={vrStyles.header}>
+            <View style={{ flex: 1 }}>
+              <Text style={vrStyles.title}>Service Report</Text>
+              {booking && (
+                <Text style={vrStyles.subtitle}>
+                  {booking.contactName} · {new Date(booking.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </Text>
+              )}
+            </View>
+            <TouchableOpacity onPress={onClose} style={vrStyles.closeBtn}>
+              <X size={20} color={colors.gray[600]} />
+            </TouchableOpacity>
+          </View>
+
+          {loading ? (
+            <View style={vrStyles.center}><Text style={vrStyles.mutedText}>Loading report...</Text></View>
+          ) : error ? (
+            <View style={vrStyles.center}>
+              <Text style={vrStyles.errorText}>{error}</Text>
+              <TouchableOpacity
+                onPress={() => setRetryKey(k => k + 1)}
+                style={{ marginTop: 16, paddingHorizontal: 24, paddingVertical: 10, backgroundColor: colors.primary[600], borderRadius: 8 }}
+              >
+                <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : !report ? (
+            <View style={vrStyles.center}><Text style={vrStyles.mutedText}>No report found for this assignment.</Text></View>
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={vrStyles.field}>
+                <Text style={vrStyles.fieldLabel}>WORK PERFORMED</Text>
+                <Text style={vrStyles.fieldValue}>{report.serviceReport?.workPerformed || '—'}</Text>
+              </View>
+              {!!report.serviceReport?.equipmentUsed && (
+                <View style={vrStyles.field}>
+                  <Text style={vrStyles.fieldLabel}>EQUIPMENT USED</Text>
+                  <Text style={vrStyles.fieldValue}>{report.serviceReport.equipmentUsed}</Text>
+                </View>
+              )}
+              {!!report.serviceReport?.issuesFound && (
+                <View style={vrStyles.field}>
+                  <Text style={vrStyles.fieldLabel}>ISSUES FOUND</Text>
+                  <Text style={vrStyles.fieldValue}>{report.serviceReport.issuesFound}</Text>
+                </View>
+              )}
+              {!!report.serviceReport?.recommendations && (
+                <View style={vrStyles.field}>
+                  <Text style={vrStyles.fieldLabel}>RECOMMENDATIONS</Text>
+                  <Text style={vrStyles.fieldValue}>{report.serviceReport.recommendations}</Text>
+                </View>
+              )}
+              <View style={vrStyles.field}>
+                <Text style={vrStyles.fieldLabel}>
+                  ATTACHMENTS {report.attachments?.length > 0 ? `(${report.attachments.length})` : ''}
+                </Text>
+                {report.attachments?.length > 0 ? (
+                  report.attachments.map((att: any, i: number) => {
+                    const isImage = att.mimeType?.startsWith('image/');
+                    const rawPath: string = att.path || att.url || '';
+                    const fileUrl = rawPath.startsWith('http')
+                      ? rawPath
+                      : `https://accuro-backend.onrender.com${rawPath}`;
+                    const fileName = att.originalName || att.filename || att.name || `File ${i + 1}`;
+                    return (
+                      <View key={i} style={vrStyles.attachItem}>
+                        {isImage ? (
+                          <Image source={{ uri: fileUrl }} style={vrStyles.attachImage} resizeMode="cover" />
+                        ) : (
+                          <TouchableOpacity
+                            style={vrStyles.attachRow}
+                            onPress={() => Linking.openURL(fileUrl)}
+                          >
+                            <Paperclip size={13} color={colors.primary[600]} />
+                            <Text style={[vrStyles.attachName, { color: colors.primary[600] }]} numberOfLines={1}>{fileName}</Text>
+                          </TouchableOpacity>
+                        )}
+                        {isImage && (
+                          <Text style={vrStyles.attachCaption} numberOfLines={1}>{fileName}</Text>
+                        )}
+                      </View>
+                    );
+                  })
+                ) : (
+                  <Text style={vrStyles.mutedText}>No attachments</Text>
+                )}
+              </View>
+              <View style={vrStyles.field}>
+                <Text style={vrStyles.fieldLabel}>SIGNATURE</Text>
+                {!!(report.signature?.signatureData || report.signatureData) ? (() => {
+                  const raw: string = report.signature?.signatureData || report.signatureData;
+                  // URL stored on server
+                  if (raw.startsWith('http')) {
+                    return (
+                      <View style={vrStyles.signatureBox}>
+                        <Image source={{ uri: raw }} style={vrStyles.signatureImage} resizeMode="contain" />
+                      </View>
+                    );
+                  }
+                  // PNG / JPEG data URI → render as Image
+                  if (raw.startsWith('data:image/png') || raw.startsWith('data:image/jpeg') || raw.startsWith('data:image/jpg')) {
+                    return (
+                      <View style={vrStyles.signatureBox}>
+                        <Image source={{ uri: raw }} style={vrStyles.signatureImage} resizeMode="contain" />
+                      </View>
+                    );
+                  }
+                  // SVG data URI → decode and render with SvgXml
+                  if (raw.startsWith('data:image/svg+xml')) {
+                    try {
+                      const base64 = raw.split(',')[1];
+                      const svgXml = (globalThis as any).atob(base64);
+                      return (
+                        <View style={vrStyles.signatureBox}>
+                          <SvgXml xml={svgXml} width="100%" height={120} />
+                        </View>
+                      );
+                    } catch {
+                      return <Text style={vrStyles.mutedText}>No signature</Text>;
+                    }
+                  }
+                  return <Text style={vrStyles.mutedText}>No signature</Text>;
+                })() : (
+                  <Text style={vrStyles.mutedText}>No signature</Text>
+                )}
+                {!!(report.signature?.signedBy || report.signedBy) && (
+                  <Text style={vrStyles.signedByText}>Signed by: {report.signature?.signedBy || report.signedBy}</Text>
+                )}
+              </View>
+              {!!(report.completedAt || report.createdAt) && (
+                <View style={vrStyles.field}>
+                  <Text style={vrStyles.fieldLabel}>SUBMITTED</Text>
+                  <Text style={vrStyles.fieldValue}>
+                    {new Date(report.completedAt || report.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                  </Text>
+                </View>
+              )}
+              <View style={{ height: 20 }} />
+            </ScrollView>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export const TechnicianAssignmentsScreen: React.FC = () => {
@@ -464,13 +690,40 @@ export const TechnicianAssignmentsScreen: React.FC = () => {
   const [reportModalBooking, setReportModalBooking] = useState<Booking | null>(null);
   const [submittingReport, setSubmittingReport] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [viewReportBooking, setViewReportBooking] = useState<Booking | null>(null);
 
   const fetchAssignments = useCallback(async () => {
     try {
-      const response = await bookingService.getMyAssignments();
-      const data = response.data || [];
-      setAssignments(data);
-      AsyncStorage.setItem(CACHE_KEY, JSON.stringify(data)).catch(() => {});
+      // Fetch from both endpoints and merge — my-assignments may exclude newly-created
+      // bookings (e.g. status: pending) that are visible on the website.
+      const [assignRes, myRes] = await Promise.allSettled([
+        bookingService.getMyAssignments(),
+        bookingService.getMyBookings(),
+      ]);
+
+      const fromAssignments: any[] =
+        assignRes.status === 'fulfilled' ? (assignRes.value as any)?.data ?? [] : [];
+      const fromMyBookings: any[] =
+        myRes.status === 'fulfilled'
+          ? Array.isArray((myRes.value as any)?.data)
+            ? (myRes.value as any).data
+            : Array.isArray(myRes.value)
+            ? (myRes.value as any)
+            : []
+          : [];
+
+      // Deduplicate by _id (assignments takes priority)
+      const seen = new Set<string>();
+      const merged: any[] = [];
+      for (const b of [...fromAssignments, ...fromMyBookings]) {
+        if (b?._id && !seen.has(b._id)) {
+          seen.add(b._id);
+          merged.push(b);
+        }
+      }
+
+      setAssignments(merged);
+      AsyncStorage.setItem(CACHE_KEY, JSON.stringify(merged)).catch(() => {});
     } catch (error) {
       console.error('Failed to load assignments:', error);
     } finally {
@@ -550,15 +803,36 @@ export const TechnicianAssignmentsScreen: React.FC = () => {
         formData.append('bookingId', reportModalBooking._id);
         formData.append('serviceReport', JSON.stringify(data.serviceReport));
         if (signatureData) {
-          formData.append('signatureData', signatureData);
-          formData.append('signedBy', data.signature.signedBy);
+          // Send as nested signature object (JSON string) — matches backend schema
+          formData.append('signature', JSON.stringify({ signatureData, signedBy: data.signature.signedBy }));
         }
         data.attachments.forEach(file => {
           (formData as any).append('attachments', { uri: file.uri, name: file.name, type: file.type });
         });
-        await api.post('/completion-proofs', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-          adapter: 'xhr',
+
+        // Use XMLHttpRequest directly — the global axios fetch adapter does not reliably
+        // handle local file:// URIs in FormData on Android.
+        const { storage: stor } = await import('../../utils/storage');
+        const { STORAGE_KEYS: SK, API_BASE_URL: BASE } = await import('../../utils/constants');
+        const token = await stor.getString(SK.TOKEN);
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', `${BASE}/completion-proofs`);
+          if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve();
+            } else {
+              try {
+                const errBody = JSON.parse(xhr.responseText);
+                reject({ response: { status: xhr.status, data: errBody } });
+              } catch {
+                reject({ response: { status: xhr.status, data: { message: 'Upload failed' } } });
+              }
+            }
+          };
+          xhr.onerror = () => reject(new Error('Network error during upload'));
+          xhr.send(formData);
         });
       } else {
         const body: any = {
@@ -566,10 +840,10 @@ export const TechnicianAssignmentsScreen: React.FC = () => {
           serviceReport: data.serviceReport,
         };
         if (signatureData) {
-          body.signatureData = signatureData;
-          body.signedBy = data.signature.signedBy;
+          // Send as nested signature object — matches backend schema and what website sends
+          body.signature = { signatureData, signedBy: data.signature.signedBy };
         }
-        await api.post('/completion-proofs', body, { adapter: 'xhr' });
+        await api.post('/completion-proofs', body);
       }
 
       Alert.alert('Success', 'Completion report submitted successfully');
@@ -602,18 +876,22 @@ export const TechnicianAssignmentsScreen: React.FC = () => {
     switch (activeTab) {
       case 'today':              return isToday(a.date);
       case 'upcoming':           return isUpcoming(a.date) && ['confirmed', 'in_progress'].includes(a.status);
-      case 'pending_completion': return a.status === 'confirmed' || a.status === 'in_progress';
+      case 'pending_completion': return ['pending', 'confirmed', 'in_progress'].includes(a.status);
       case 'pending_review':     return a.status === 'pending_review';
       case 'completed':          return a.status === 'completed';
+      case 'verified':           return a.status === 'verified';
+      case 'payment_submitted':  return a.status === 'payment_submitted';
       default:                   return true;
     }
   }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const todayCount = assignments.filter(a => isToday(a.date)).length;
   const upcomingCount = assignments.filter(a => isUpcoming(a.date) && ['confirmed', 'in_progress'].includes(a.status)).length;
-  const pendingCount = assignments.filter(a => a.status === 'confirmed' || a.status === 'in_progress').length;
+  const pendingCount = assignments.filter(a => ['pending', 'confirmed', 'in_progress'].includes(a.status)).length;
   const reviewCount = assignments.filter(a => a.status === 'pending_review').length;
   const completedCount = assignments.filter(a => a.status === 'completed').length;
+  const verifiedCount = assignments.filter(a => a.status === 'verified').length;
+  const paymentSubmittedCount = assignments.filter(a => a.status === 'payment_submitted').length;
   const allCount = assignments.length;
 
   const TAB_BADGE_COLORS: Record<string, string> = {
@@ -622,6 +900,8 @@ export const TechnicianAssignmentsScreen: React.FC = () => {
     pending_completion: '#f97316',
     pending_review: '#7c3aed',
     completed: '#15803d',
+    verified: '#0f766e',
+    payment_submitted: '#4338ca',
     all: '#6b7280',
   };
 
@@ -632,6 +912,8 @@ export const TechnicianAssignmentsScreen: React.FC = () => {
       case 'pending_completion': return pendingCount;
       case 'pending_review': return reviewCount;
       case 'completed': return completedCount;
+      case 'verified': return verifiedCount;
+      case 'payment_submitted': return paymentSubmittedCount;
       case 'all': return allCount;
       default: return 0;
     }
@@ -782,6 +1064,15 @@ export const TechnicianAssignmentsScreen: React.FC = () => {
                         <Text style={[styles.btnText, { color: '#15803d' }]}>Completed</Text>
                       </View>
                     )}
+                    {['pending_review', 'completed', 'verified', 'payment_submitted'].includes(booking.status) && (
+                      <TouchableOpacity
+                        style={[styles.btn, styles.viewReportBtn]}
+                        onPress={() => setViewReportBooking(booking)}
+                      >
+                        <FileText size={13} color="#0f766e" />
+                        <Text style={[styles.btnText, { color: '#0f766e' }]}>View Report</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               );
@@ -818,6 +1109,13 @@ export const TechnicianAssignmentsScreen: React.FC = () => {
         onClose={() => setReportModalBooking(null)}
         onSubmit={handleSubmitReport}
         submitting={submittingReport}
+      />
+
+      {/* View Report Modal */}
+      <ViewReportModal
+        visible={!!viewReportBooking}
+        booking={viewReportBooking}
+        onClose={() => setViewReportBooking(null)}
       />
     </View>
   );
@@ -950,6 +1248,7 @@ const styles = StyleSheet.create({
   submitBtn: { backgroundColor: '#059669' },
   reviewingBtn: { backgroundColor: '#ede9fe', borderWidth: 1, borderColor: '#c4b5fd' },
   completedBtn: { backgroundColor: '#dcfce7', borderWidth: 1, borderColor: '#86efac' },
+  viewReportBtn: { backgroundColor: '#ccfbf1', borderWidth: 1, borderColor: '#5eead4' },
   btnText: { fontSize: 12, fontWeight: '600', color: '#fff' },
 });
 
@@ -1055,6 +1354,15 @@ const mStyles = StyleSheet.create({
   },
   reviewItem: { fontSize: 13, color: colors.gray[700], marginBottom: 3, lineHeight: 18 },
   reviewKey: { fontWeight: '600', color: colors.gray[800] },
+  reviewSigBox: {
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  reviewSigName: { fontSize: 12, color: colors.gray[500], padding: 6, textAlign: 'center' },
 
   // Navigation
   navRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
@@ -1110,3 +1418,79 @@ const sigStyles = StyleSheet.create({
 });
 
 export default TechnicianAssignmentsScreen;
+
+const vrStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  container: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray[100],
+  },
+  title: { fontSize: 18, fontWeight: '700', color: colors.gray[900] },
+  subtitle: { fontSize: 13, color: colors.gray[500], marginTop: 2 },
+  closeBtn: {
+    padding: 6,
+    backgroundColor: colors.gray[100],
+    borderRadius: 8,
+  },
+  center: { alignItems: 'center', paddingVertical: 40 },
+  mutedText: { color: colors.gray[500], fontSize: 14 },
+  errorText: { color: '#dc2626', fontSize: 14 },
+  field: {
+    backgroundColor: colors.gray[50],
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
+  },
+  fieldLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.gray[400],
+    letterSpacing: 0.8,
+    marginBottom: 6,
+  },
+  fieldValue: { fontSize: 14, color: colors.gray[800], lineHeight: 20 },
+  attachItem: { marginTop: 8 },
+  attachRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: colors.gray[100],
+    borderRadius: 8,
+  },
+  attachImage: {
+    width: '100%',
+    height: 180,
+    borderRadius: 8,
+    backgroundColor: colors.gray[200],
+  },
+  attachName: { fontSize: 13, color: colors.gray[700], flex: 1 },
+  attachCaption: { fontSize: 11, color: colors.gray[500], marginTop: 4, textAlign: 'center' },
+  signatureBox: {
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  signatureImage: {
+    width: '100%',
+    height: 120,
+    backgroundColor: '#fff',
+  },
+  signedByText: { fontSize: 12, color: colors.gray[500], marginTop: 4 },
+});

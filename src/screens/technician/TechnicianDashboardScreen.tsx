@@ -45,11 +45,13 @@ const formatTime = (time: string) => {
 };
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }> = {
-  confirmed:      { bg: '#dbeafe', text: '#1d4ed8', label: 'Confirmed' },
-  in_progress:    { bg: '#fef9c3', text: '#b45309', label: 'In Progress' },
-  pending_review: { bg: '#ede9fe', text: '#7c3aed', label: 'Pending Review' },
-  completed:      { bg: '#dcfce7', text: '#15803d', label: 'Completed' },
-  cancelled:      { bg: '#fee2e2', text: '#dc2626', label: 'Cancelled' },
+  confirmed:         { bg: '#dbeafe', text: '#1d4ed8', label: 'Confirmed' },
+  in_progress:       { bg: '#fef9c3', text: '#b45309', label: 'In Progress' },
+  pending_review:    { bg: '#ede9fe', text: '#7c3aed', label: 'Pending Review' },
+  completed:         { bg: '#dcfce7', text: '#15803d', label: 'Completed' },
+  cancelled:         { bg: '#fee2e2', text: '#dc2626', label: 'Cancelled' },
+  verified:          { bg: '#ccfbf1', text: '#0f766e', label: 'Verified' },
+  payment_submitted: { bg: '#e0e7ff', text: '#4338ca', label: 'Payment Submitted' },
 };
 
 export const TechnicianDashboardScreen: React.FC = () => {
